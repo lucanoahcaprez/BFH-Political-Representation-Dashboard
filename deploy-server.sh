@@ -76,15 +76,27 @@ install_if_missing certbot certbot
 
 # --- Ask for and validate target directory path ---
 while true; do
-  read -e -p "Enter full path for deployment directory [leave empty for: ./political-dashboard]: " TARGET_DIR
-  TARGET_DIR=${TARGET_DIR:-"./political-dashboard"}
+  DEFAULT_DIR="$HOME/political-dashboard"
+  read -e -p "Enter full absolute path for deployment directory [leave empty for: $DEFAULT_DIR]: " TARGET_DIR
+  TARGET_DIR=${TARGET_DIR:-"$DEFAULT_DIR"}
 
+  # Remove trailing slash if present
+  TARGET_DIR="${TARGET_DIR%/}"
+
+  # Only allow paths under $HOME (e.g. /Users/yourname/... on macOS)
+  if [[ "$TARGET_DIR" != "$HOME"* ]]; then
+    echo -e "${RED}Invalid path.${NC} Please choose a directory inside your home folder (e.g., under $HOME)."
+    continue
+  fi
+
+  # Validate characters
   if [[ "$TARGET_DIR" =~ [^a-zA-Z0-9._/\ ~-] ]]; then
     echo -e "${RED}Invalid characters in path.${NC}"
     echo "Allowed: letters, numbers, dots (.), dashes (-), underscores (_), slashes (/), and spaces."
     continue
   fi
 
+  # Just ensure directory exists, do not create subfolder
   mkdir -p "$TARGET_DIR" 2>/dev/null || {
     echo -e "${RED}Failed to create or access directory: $TARGET_DIR${NC}"
     continue
