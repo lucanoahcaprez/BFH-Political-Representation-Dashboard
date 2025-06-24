@@ -60,18 +60,57 @@ install_if_missing() {
 # --- Dependency Install ---
 if $IS_MAC; then
   command -v brew >/dev/null || /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  install_if_missing colima colima
+  install_if_missing docker docker
+  install_if_missing docker-compose docker-compose
+  
+elif $IS_LINUX; then
+  install_if_missing docker docker.io
+  install_if_missing docker-compose docker-compose
 fi
 
-install_if_missing docker docker.io
-install_if_missing docker-compose docker-compose
 install_if_missing curl curl
 install_if_missing git git
 install_if_missing nginx nginx
 install_if_missing certbot certbot
 
-# --- Ask for target directory ---
-read -p "Enter deployment directory [default: political-dashboard]: " TARGET_DIR
-TARGET_DIR=${TARGET_DIR:-political-dashboard}
+# --- Ask for and validate target directory path ---
+while true; do
+  read -e -p "Enter full path for deployment directory [leave empty for: ./political-dashboard]: " TARGET_DIR
+  TARGET_DIR=${TARGET_DIR:-"./political-dashboard"}
+
+  if [[ "$TARGET_DIR" =~ [^a-zA-Z0-9._/\ ~-] ]]; then
+    echo -e "${RED}Invalid characters in path.${NC}"
+    echo "Allowed: letters, numbers, dots (.), dashes (-), underscores (_), slashes (/), and spaces."
+    continue
+  fi
+
+  mkdir -p "$TARGET_DIR" 2>/dev/null || {
+    echo -e "${RED}Failed to create directory: $TARGET_DIR${NC}"
+    continue
+  }
+
+  cd "$TARGET_DIR" || {
+    echo -e "${RED}Cannot access directory: $TARGET_DIR${NC}"
+    continue
+  }
+
+  break
+done
+
+
+# --- Clone or Pull Project ---
+if [ -d ".git" ]; then
+  echo "Git repository already exists in target directory."
+  read -p "Pull latest changes from Git? [y/N]: " PULL
+  if [[ "$PULL" =~ ^[Yy]$ ]]; then
+    git pull origin "$BRANCH"
+  fi
+else
+  echo "Cloning project into current directory..."
+  git clone -b "$BRANCH" "$REPO_URL" . || exit 1
+fi
+
 
 # --- Docker Daemon Check ---
 echo "Checking if Docker is running..."
@@ -82,17 +121,24 @@ if ! docker info &>/dev/null; then
     sudo systemctl start docker
     sleep 3
   elif $IS_MAC; then
-    echo "Attempting to start Docker Desktop on macOS..."
-    open -a Docker
-    echo "Waiting for Docker to start..."
-    while ! docker info &>/dev/null; do
-      sleep 2
-      echo -n "."
-    done
+  echo "Starting Colima..."
+  colima start
+  echo "Waiting for Docker to become available..."
+  while ! docker info &>/dev/null; do
+    sleep 2
+    echo -n "."
+  done
   elif $IS_WINDOWS; then
-    echo -e "${RED}Docker is not running. Please open Docker Desktop manually.${NC}"
+  if ! command -v docker &> /dev/null; then
+    echo -e "${YELLOW}Docker not found. Downloading Docker Desktop installer...${NC}"
+    curl -L -o DockerDesktopInstaller.exe "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
+    echo -e "${YELLOW}Please run DockerDesktopInstaller.exe manually to install Docker. If you need to restart your device, please start the script again after installing Docker Desktop${NC}"
+    read -p "Press ENTER after installing Docker Desktop and starting it..."
+  else
+    echo -e "${YELLOW}Please make sure Docker Desktop is running.${NC}"
     read -p "Press ENTER once Docker is started..."
   fi
+
   if ! docker info &>/dev/null; then
     echo -e "${RED}Failed to start Docker. Please start it manually and retry.${NC}"
     exit 1
@@ -123,7 +169,7 @@ configure_env_file() {
   APP_DOMAIN=$(echo "$APP_DOMAIN" | tr -d ' ')
 
   while :; do
-    read -p "Frontend port [default 8080]: " FRONTEND_PORT
+    read -p "Frontend port [leave empty for default: 8080]: " FRONTEND_PORT
     FRONTEND_PORT=${FRONTEND_PORT:-8080}
     if lsof -i TCP:$FRONTEND_PORT &>/dev/null; then
       echo -e "${RED}Port $FRONTEND_PORT is already in use. Please choose another.${NC}"
@@ -132,17 +178,30 @@ configure_env_file() {
     fi
   done
 
-  read -p "Backend port [default 3000]: " BACKEND_PORT
-  BACKEND_PORT=${BACKEND_PORT:-3000}
-  read -p "DB port [default 5432]: " DB_PORT
-  DB_PORT=${DB_PORT:-5432}
-  read -p "Postgres user [default: postgres]: " POSTGRES_USER
-  POSTGRES_USER=${POSTGRES_USER:-postgres}
-  read -p "Postgres password: " POSTGRES_PASSWORD
-  read -p "Postgres DB name [default: political_dashboard]: " POSTGRES_DB
-  POSTGRES_DB=${POSTGRES_DB:-political_dashboard}
+echo ""
+echo "Configure backend and database connection:"
+echo "  (Just press ENTER to use the default value in brackets)"
+echo ""
 
-  DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+read -p "Backend port [default: 3000]: " BACKEND_PORT
+BACKEND_PORT=${BACKEND_PORT:-3000}
+
+read -p "Database port [default: 5432]: " DB_PORT
+DB_PORT=${DB_PORT:-5432}
+
+read -p "Postgres user [default: postgres]: " POSTGRES_USER
+POSTGRES_USER=${POSTGRES_USER:-postgres}
+
+echo ""
+echo "Please choose a secure Postgres password. This will be stored in your local .env.deploy file."
+read -p "Postgres password: " POSTGRES_PASSWORD
+while [[ -z "$POSTGRES_PASSWORD" ]]; do
+  echo "Password cannot be empty."
+  read -p "Postgres password: " POSTGRES_PASSWORD
+done
+
+POSTGRES_DB="political_dashboard"
+
 
   cat <<EOF > $ENV_FILE
 APP_DOMAIN=$APP_DOMAIN
