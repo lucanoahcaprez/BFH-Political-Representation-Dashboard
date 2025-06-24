@@ -86,30 +86,17 @@ while true; do
   fi
 
   mkdir -p "$TARGET_DIR" 2>/dev/null || {
-    echo -e "${RED}Failed to create directory: $TARGET_DIR${NC}"
-    continue
-  }
-
-  cd "$TARGET_DIR" || {
-    echo -e "${RED}Cannot access directory: $TARGET_DIR${NC}"
+    echo -e "${RED}Failed to create or access directory: $TARGET_DIR${NC}"
     continue
   }
 
   break
 done
 
-
-# --- Clone or Pull Project ---
-if [ -d ".git" ]; then
-  echo "Git repository already exists in target directory."
-  read -p "Pull latest changes from Git? [y/N]: " PULL
-  if [[ "$PULL" =~ ^[Yy]$ ]]; then
-    git pull origin "$BRANCH"
-  fi
-else
-  echo "Cloning project into current directory..."
-  git clone -b "$BRANCH" "$REPO_URL" . || exit 1
-fi
+cd "$TARGET_DIR" || {
+  echo -e "${RED}Cannot access directory: $TARGET_DIR${NC}"
+  exit 1
+}
 
 
 # --- Docker Daemon Check ---
