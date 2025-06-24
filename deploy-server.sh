@@ -202,8 +202,9 @@ done
 
 POSTGRES_DB="political_dashboard"
 
+DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
 
-  cat <<EOF > $ENV_FILE
+cat <<EOF > $ENV_FILE
 APP_DOMAIN=$APP_DOMAIN
 FRONTEND_PORT=$FRONTEND_PORT
 BACKEND_PORT=$BACKEND_PORT
@@ -215,6 +216,7 @@ DATABASE_URL=$DATABASE_URL
 FRONTEND_IMAGE=political-dashboard-frontend
 BACKEND_IMAGE=political-dashboard-backend
 EOF
+
 }
 
 if [ ! -f "$ENV_FILE" ]; then
