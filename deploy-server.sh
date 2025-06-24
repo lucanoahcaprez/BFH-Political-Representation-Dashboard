@@ -148,6 +148,24 @@ fi
 
 echo -e "${GREEN}Docker is running.${NC}"
 
+# --- Fix for missing docker-credential-desktop (common with Colima on macOS) ---
+if $IS_MAC; then
+  DOCKER_CONFIG_FILE="$HOME/.docker/config.json"
+  if [ -f "$DOCKER_CONFIG_FILE" ] && grep -q '"credsStore": *"desktop"' "$DOCKER_CONFIG_FILE"; then
+    echo -e "${YELLOW}Fixing Docker config: removing 'docker-credential-desktop'...${NC}"
+    # Remove the credsStore line safely
+    sed -i.bak '/"credsStore": *"desktop"/d' "$DOCKER_CONFIG_FILE"
+    echo -e "${GREEN}Docker config patched successfully. Restarting Colima...${NC}"
+    colima stop && colima start
+    echo "Waiting for Docker to become available again..."
+    while ! docker info &>/dev/null; do
+      sleep 2
+      echo -n "."
+    done
+  fi
+fi
+
+
 # --- Clone or Pull Project ---
 if [ -d "$TARGET_DIR" ]; then
   echo "Project directory already exists."
