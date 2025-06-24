@@ -144,6 +144,7 @@ if ! docker info &>/dev/null; then
     exit 1
   fi
 fi
+fi
 
 echo -e "${GREEN}Docker is running.${NC}"
 
