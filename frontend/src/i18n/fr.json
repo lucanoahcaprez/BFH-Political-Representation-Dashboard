@@ -22,7 +22,7 @@
   },
   "intro": {
     "projectTitle": "Tableau de représentation politique",
-    "projectDescription": "Ce tableau de bord évalue dans quelle mesure les institutions politiques – Conseil fédéral, Parlement et partis politiques – représentent la volonté du peuple lors des votations fédérales. Les recommandations sont comparées au résultat réel du vote afin de calculer une valeur numérique de représentativité.",
+    "projectDescription": "Ce tableau de bord évalue dans quelle mesure les institutions politiques – Conseil fédéral, Parlement et partis politiques – représentent la volonté du peuple lors des votations fédérales. Les recommandations sont comparées au résultat réel du vote afin de calculer une valeur numérique de représentativité. 	Hypothèse : Les électeurs sont bien informés",
     "formulaTitle": "Formule :",
     "tooltip": "R(V, A) résulte de la comparaison entre A(V) (recommandation) et S(V) (décision populaire).",
     "formulaExplanation": "A(V) est la recommandation de l’acteur A (par ex. Conseil fédéral, Parlement, parti) sur la proposition V, et S(V) est le verdict du peuple."
