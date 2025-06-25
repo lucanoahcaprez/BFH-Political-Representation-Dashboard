@@ -62,9 +62,12 @@ Backend API: http://localhost:3000/api
 
 ---
 
-##  Data Source
+## Data Source
 
-We use the official open dataset from **[Swissvotes](https://swissvotes.ch/page/dataset/)**  
+This project uses data from the [Swissvotes dataset](https://swissvotes.ch/page/dataset), which is licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license.  
+**Source:** Swissvotes (2024), Année Politique Suisse, University of Bern.
+This dataset is regularly updated via automated fetches. For the most recent access date, refer to the backend logs or commit history.
+
 
 
 ---
@@ -77,8 +80,10 @@ We use the official open dataset from **[Swissvotes](https://swissvotes.ch/page/
 
 ---
 
-##  License
+## License
 
 This project is licensed under the **MIT License** – see [`LICENSE`](./LICENSE) for details.
 
-All dependencies used are open source and MIT-compatible. See `package.json` for details.
+All dependencies are open source and MIT-compatible – see `package.json` for exact versions.
+
+> Note: While this codebase is MIT-licensed, it integrates open government data under CC BY 4.0. If you reuse this project and include the data, please ensure you also comply with the attribution terms of the Swissvotes dataset.
