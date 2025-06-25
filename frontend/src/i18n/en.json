@@ -21,7 +21,7 @@
   },
   "intro": {
     "projectTitle": "Political Representation Dashboard",
-    "projectDescription": "This dashboard evaluates how well political institutions – Federal Council, Parliament, and political parties – represent the will of the people in national referendums. Recommendations are compared to the actual voting outcome to derive a numeric representativeness value.",
+    "projectDescription": "This dashboard evaluates how well political institutions – Federal Council, Parliament, and political parties – represent the will of the people in national referendums. Recommendations are compared to the actual voting outcome to derive a numeric representativeness value. Assumption: Voters are well-informed",
     "formulaTitle": "Formula:",
     "tooltip": "R(V, A) results from comparing A(V) (recommendation) with S(V) (public decision).",
     "formulaExplanation": "A(V) is the recommendation of actor A (e.g. Federal Council, Parliament, party) on proposal V, and S(V) is the verdict of the public."
