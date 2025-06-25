@@ -119,7 +119,9 @@
     "projectInfo": "Dieses Dashboard wurde im Rahmen eines Studienprojekts an der Berner Fachhochschule (BFH) entwickelt.",
     "authors": "Autoren: ",
     "supervisor": "Betreut von: ",
-    "license": "Der gesamte Quellcode steht unter der"
+    "license": "Der gesamte Quellcode steht unter der",
+    "lastUpdate": "Letztes Datenbank-Update",
+    "loading": "lädt..."
   }
 
 }
