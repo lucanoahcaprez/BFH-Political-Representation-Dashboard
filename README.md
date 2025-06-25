@@ -65,7 +65,7 @@ Backend API: http://localhost:3000/api
 ##  Data Source
 
 We use the official open dataset from **[Swissvotes](https://swissvotes.ch/page/dataset/)**  
- The dataset is public under [Open Government Data](https://opendata.swiss/en/dataset/swissvotes).
+
 
 ---
 
