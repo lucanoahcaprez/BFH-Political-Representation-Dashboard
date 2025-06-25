@@ -285,9 +285,9 @@ while true; do
   echo -e "${GREEN}Deployment is running.${NC} What would you like to do?"
   echo "1) Show container logs"
   echo "2) Open frontend in browser"
-  echo "3) Stop and exit"
+  echo "3) Stop and deep exit (Requires rerunning script)"
   echo "4) Restart containers"
-  echo "5) Exit (leave running)"
+  echo "5) Shallow Exit (closes terminal blocks $APP_DOMAIN)"
   read -p "Enter choice [1-5]: " CHOICE
 
   case "$CHOICE" in
