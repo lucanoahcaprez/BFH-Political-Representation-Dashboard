@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "dev": "ts-node src/index.ts",
+    "update-data": "ts-node src/utils/update.ts"
   },
   "keywords": [],
   "author": "",
@@ -32,4 +34,6 @@
     "typescript": "^5.8.2",
     "vitest": "^3.1.2"
   }
+
+
 }
