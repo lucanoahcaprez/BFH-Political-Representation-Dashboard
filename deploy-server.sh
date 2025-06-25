@@ -76,40 +76,61 @@ install_if_missing certbot certbot
 
 # --- Ask for and validate target directory path ---
 while true; do
-  DEFAULT_DIR="$HOME/political-dashboard"
-  read -e -p "Enter full absolute path for deployment directory [leave empty for: $DEFAULT_DIR]: " TARGET_DIR
-  TARGET_DIR=${TARGET_DIR:-"$DEFAULT_DIR"}
+  read -e -p "Enter full absolute path for deployment directory [leave empty for: $HOME/political-dashboard]: " TARGET_DIR
+  TARGET_DIR=${TARGET_DIR:-"$HOME/political-dashboard"}
 
-  # Remove trailing slash if present
-  TARGET_DIR="${TARGET_DIR%/}"
-
-  # Only allow paths under $HOME (e.g. /Users/yourname/... on macOS)
-  if [[ "$TARGET_DIR" != "$HOME"* ]]; then
-    echo -e "${RED}Invalid path.${NC} Please choose a directory inside your home folder (e.g., under $HOME)."
-    continue
-  fi
-
-  # Validate characters
   if [[ "$TARGET_DIR" =~ [^a-zA-Z0-9._/\ ~-] ]]; then
     echo -e "${RED}Invalid characters in path.${NC}"
     echo "Allowed: letters, numbers, dots (.), dashes (-), underscores (_), slashes (/), and spaces."
     continue
   fi
 
-  # Just ensure directory exists, do not create subfolder
   mkdir -p "$TARGET_DIR" 2>/dev/null || {
-    echo -e "${RED}Failed to create or access directory: $TARGET_DIR${NC}"
+    echo -e "${RED}Failed to create directory: $TARGET_DIR${NC}"
     continue
   }
 
-  break
+  cd "$TARGET_DIR" || {
+    echo -e "${RED}Cannot access directory: $TARGET_DIR${NC}"
+    continue
+  }
+
+  if [ -d ".git" ]; then
+    echo -e "${GREEN}Git repository already exists in target directory.${NC}"
+    read -p "Pull latest changes from Git? [y/N]: " PULL
+    if [[ "$PULL" =~ ^[Yy]$ ]]; then
+      git pull origin "$BRANCH"
+    fi
+    break
+
+  elif [ -z "$(ls -A .)" ]; then
+    echo -e "${GREEN}Directory is empty. Cloning project...${NC}"
+    git clone -b "$BRANCH" "$REPO_URL" . || exit 1
+    break
+
+  else
+    echo -e "${YELLOW}Directory is not empty and not a Git repository.${NC}"
+    read -p "Choose a subfolder name to clone the project into (e.g. 'dashboard-clone'): " NEW_SUBDIR
+    if [[ -z "$NEW_SUBDIR" ]]; then
+      echo -e "${RED}You must enter a subfolder name.${NC}"
+      continue
+    fi
+
+    mkdir -p "$TARGET_DIR/$NEW_SUBDIR" || {
+      echo -e "${RED}Could not create subfolder '$NEW_SUBDIR'. Try again.${NC}"
+      continue
+    }
+
+    cd "$TARGET_DIR/$NEW_SUBDIR" || {
+      echo -e "${RED}Failed to enter '$NEW_SUBDIR'.${NC}"
+      continue
+    }
+
+    echo -e "${GREEN}Cloning project into subfolder '$NEW_SUBDIR'...${NC}"
+    git clone -b "$BRANCH" "$REPO_URL" . || exit 1
+    break
+  fi
 done
-
-cd "$TARGET_DIR" || {
-  echo -e "${RED}Cannot access directory: $TARGET_DIR${NC}"
-  exit 1
-}
-
 
 # --- Docker Daemon Check ---
 echo "Checking if Docker is running..."
