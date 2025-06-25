@@ -121,7 +121,9 @@
     "projectInfo": "Ce tableau de bord a été développé dans le cadre d'un projet d'études à la Haute école spécialisée bernoise (BFH).",
     "authors": "Auteurs : ",
     "supervisor": "Supervisé par : ",
-    "license": "L'ensemble du code source est sous licence"
+    "license": "L'ensemble du code source est sous licence",
+    "lastUpdate": "Dernière mise à jour de la base de données",
+    "loading": "chargement..."
   }
 
 }
