@@ -206,7 +206,7 @@ configure_env_file() {
 
 echo ""
 echo "Configure backend and database connection:"
-echo "  (Just press ENTER to use the default value in brackets)"
+echo "  [Just press ENTER to use the default value in brackets]"
 echo ""
 
 read -p "Backend port [default: 3000]: " BACKEND_PORT
