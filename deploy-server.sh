@@ -289,7 +289,7 @@ while true; do
   echo "2. Open frontend in browser"
   echo "3. Stop and deep exit [Requires rerunning script]"
   echo "4. Restart containers"
-  echo "5. Shallow Exit [closes terminal blocks $APP_DOMAIN]"
+  echo "5. Shallow Exit [Closes terminal blocks your Domain]"
   read -p "Enter choice [1-5]: " CHOICE
 
   case "$CHOICE" in
