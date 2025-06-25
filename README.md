@@ -36,6 +36,11 @@ Developed as part of a student project at **Berner Fachhochschule (BFH)**.
 
 This deployment works on macOS, Linux, and Windows (via Git Bash or WSL).
 
+> On macOS, the script uses [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop.
+> Colima is automatically installed if Docker is not already running, making the setup lightweight and M1/M2-compatible. Colima is a container runtime for macOS that replaces Docker Desktop and integrates well with the Docker CLI.
+
+
+
 
 # 1. Download the deployment script
 ```bash
