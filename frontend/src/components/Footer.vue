@@ -8,6 +8,7 @@
       />
 
       <div class="footer-text">
+        <p><LastUpdate /></p>
         <p>
           {{ t('footer.dataSource') }}
           <a href="https://swissvotes.ch" target="_blank" rel="noopener">Swissvotes</a>
@@ -42,6 +43,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import LastUpdate from '@/components/LastUpdate.vue'
 const { t } = useI18n()
 </script>
 
