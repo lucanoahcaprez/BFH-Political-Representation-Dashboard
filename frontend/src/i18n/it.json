@@ -21,7 +21,7 @@
   },
   "intro": {
     "projectTitle": "Dashboard della rappresentanza politica",
-    "projectDescription": "Questa dashboard valuta quanto bene le istituzioni politiche – Consiglio federale, Parlamento e partiti politici – rappresentano la volontà del popolo nei referendum federali. Le raccomandazioni vengono confrontate con il risultato effettivo del voto per calcolare un valore numerico di rappresentatività.",
+    "projectDescription": "Questa dashboard valuta quanto bene le istituzioni politiche – Consiglio federale, Parlamento e partiti politici – rappresentano la volontà del popolo nei referendum federali. Le raccomandazioni vengono confrontate con il risultato effettivo del voto per calcolare un valore numerico di rappresentatività. 	Ipotesi: Gli elettori sono ben informati",
     "formulaTitle": "Formula:",
     "tooltip": "R(V, A) deriva dal confronto tra A(V) (raccomandazione) e S(V) (decisione popolare).",
     "formulaExplanation": "A(V) è la raccomandazione dell’attore A (ad es. Consiglio federale, Parlamento, partito) sulla proposta V, e S(V) è il verdetto del popolo."
