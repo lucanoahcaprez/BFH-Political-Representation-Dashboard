@@ -118,7 +118,9 @@
     "projectInfo": "This dashboard was developed as part of a student project at Bern University of Applied Sciences (BFH).",
     "authors": "Authors: ",
     "supervisor": "Supervised by: ",
-    "license": "The entire source code is licensed under the"
+    "license": "The entire source code is licensed under the",
+    "lastUpdate": "Last database update",
+    "loading": "loading..."
   }
 
 }
