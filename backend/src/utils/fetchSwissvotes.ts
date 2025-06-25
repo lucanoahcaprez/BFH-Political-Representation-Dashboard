@@ -55,7 +55,11 @@ function formatDate(dateStr: string): string {
 export async function fetchSwissvotesData(client: Client | Pool) {
     try {
         const response = await axios.get(SWISSVOTES_CSV_URL, {responseType: "stream"});
-
+       await client.query(` CREATE TABLE IF NOT EXISTS meta (
+       key TEXT PRIMARY KEY,
+      value TEXT
+  );
+`);
         // Tabellenstruktur sicherstellen
         await client.query(`
             CREATE TABLE IF NOT EXISTS swissvotes
