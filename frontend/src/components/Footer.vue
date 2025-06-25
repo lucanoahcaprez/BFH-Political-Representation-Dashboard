@@ -21,7 +21,7 @@
           <a href="https://www.linkedin.com/in/sujal-singh-basnet-99106a300/" target="_blank" rel="noopener">Sujal Singh Basnet</a>
           <br />
           {{ t('footer.supervisor') }}
-          <a href="https://www.simon-kramer.ch/" target="_blank" rel="noopener">Prof. Dr. Simon Kramer</a>
+          <a href="https://www.simon-kramer.ch/" target="_blank" rel="noopener">Dr. Simon Kramer</a>
         </p>
 
 
