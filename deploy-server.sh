@@ -187,22 +187,6 @@ if $IS_MAC; then
 fi
 
 
-# --- Clone or Pull Project ---
-if [ -d "$TARGET_DIR" ]; then
-  echo "Project directory already exists."
-  read -p "Pull latest changes from Git? [y/N]: " PULL
-  if [[ "$PULL" =~ ^[Yy]$ ]]; then
-    cd "$TARGET_DIR"
-    git pull origin "$BRANCH"
-    cd ..
-  fi
-else
-  echo "Cloning project..."
-  git clone -b "$BRANCH" "$REPO_URL" "$TARGET_DIR" || exit 1
-fi
-
-cd "$TARGET_DIR" || { echo -e "${RED}Cannot access directory $TARGET_DIR${NC}"; exit 1; }
-
 # --- ENV Config ---
 configure_env_file() {
   read -p "Enter your domain (leave empty or type 'localhost' to use http://localhost): " APP_DOMAIN
