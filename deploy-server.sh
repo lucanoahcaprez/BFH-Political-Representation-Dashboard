@@ -122,6 +122,7 @@ if ! docker info &>/dev/null; then
   elif $IS_MAC; then
   echo "Starting Colima..."
   colima start
+  export DOCKER_HOST=unix://$HOME/.colima/docker.sock
   echo "Waiting for Docker to become available..."
   while ! docker info &>/dev/null; do
     sleep 2
