@@ -145,7 +145,7 @@ if ! docker info &>/dev/null; then
   colima start
   export DOCKER_HOST=unix://$HOME/.colima/docker.sock
   echo "Waiting for Docker to become available..."
-  echo "If this is taking to long, there could be a problem in the .docker folder. I you are sure you can delete this folder and start the script again. 
+  echo "If this is taking to long, there could be a problem in the .docker folder. I you are sure you can delete this folder and start the script again."
   while ! docker info &>/dev/null; do
     sleep 2
     echo -n "."
