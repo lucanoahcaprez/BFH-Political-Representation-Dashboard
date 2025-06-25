@@ -310,6 +310,7 @@ app.get("/api/diagram/trends-repraesentation", async (req, res) => {
         res.status(500).json({message: "Interner Serverfehler"});
     }
 });
+
 /**
  * Thematic analysis of votes and actor recommendations.
  * Groups votes by topic (oberkategorie) and returns all recommendations and outcomes.
@@ -350,6 +351,26 @@ app.get("/api/diagram/themenanalyse", async (req, res) => {
         res.status(500).json({message: "Interner Serverfehler"});
     }
 });
+
+
+app.get("/api/last-update", async (req, res) => {
+    console.log("Backend API DB URL:", process.env.DATABASE_URL)
+
+    pool.query("SELECT value FROM meta WHERE key = $1", ['last_update'])
+        .then(result => {
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: 'Not found' });
+            }
+            res.json({ lastModified: result.rows[0].value });
+        })
+        .catch(error => {
+            console.error("Fehler beim Abrufen des letzten Updates:", error);
+            res.status(500).json({ error: 'Interner Serverfehler' });
+        });
+});
+
+
+
 app.use(((req: Request, res: Response, next: NextFunction) => {
     if (req.method !== 'GET' && req.path.startsWith('/api/')) {
         return res.status(405).json({message: 'Method Not Allowed'});
