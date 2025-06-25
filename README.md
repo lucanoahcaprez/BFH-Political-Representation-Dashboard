@@ -73,7 +73,7 @@ We use the official open dataset from **[Swissvotes](https://swissvotes.ch/page/
 
 - **Damian Lienhart**
 - **Sujal Singh Basnet**
-- Project supervised by **Prof. Dr. Simon Kramer** (BFH)
+- Project supervised by **Dr. Simon Kramer** (BFH)
 
 ---
 
