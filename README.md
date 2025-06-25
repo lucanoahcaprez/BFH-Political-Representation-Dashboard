@@ -66,7 +66,7 @@ Backend API: http://localhost:3000/api
 
 This project uses data from the [Swissvotes dataset](https://swissvotes.ch/page/dataset), which is licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license.  
 **Source:** Swissvotes (2024), Année Politique Suisse, University of Bern.
-This dataset is regularly updated via automated fetches. For the most recent access date, refer to the backend logs or commit history.
+This dataset is regularly accessed via automated fetches. For the most recent access date, refer to the backend logs.
 
 
 
