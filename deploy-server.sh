@@ -191,7 +191,7 @@ fi
 # --- ENV Config ---
 configure_env_file() {
   read -p "Enter your domain (leave empty or type 'localhost' to use http://localhost): " APP_DOMAIN
-  APP_DOMAIN=$(echo "$APP_DOMAIN" | tr -d ' ') 
+  APP_DOMAIN=$(echo "$APP_DOMAIN" | tr -d ' ')
 
 
   while :; do
