@@ -21,7 +21,7 @@
   },
   "intro": {
     "projectTitle": "Dashboard zur politischen Repräsentation",
-    "projectDescription": "Dieses Dashboard analysiert, wie gut politische Institutionen – Bundesrat, Parlament und politische Parteien – den Volkswillen in eidgenössischen Abstimmungen repräsentieren. Die Empfehlungen werden mit dem tatsächlichen Abstimmungsergebnis verglichen, um einen numerischen Repräsentativitätswert zu berechnen.",
+    "projectDescription": "Dieses Dashboard analysiert, wie gut politische Institutionen – Bundesrat, Parlament und politische Parteien – den Volkswillen in eidgenössischen Abstimmungen repräsentieren. Die Empfehlungen werden mit dem tatsächlichen Abstimmungsergebnis verglichen, um einen numerischen Repräsentativitätswert zu berechnen. Annahme: Die Wählenden sind gut informiert",
     "formulaTitle": "Formel:",
     "tooltip": "R(V, A) ergibt sich durch den Vergleich von A(V) (Empfehlung) mit S(V) (Volksentscheid).",
     "formulaExplanation": "A(V) ist die Empfehlung des Akteurs A (z. B. Bundesrat, Parlament, Partei) zur Vorlage V, und S(V) das Verdikt des Volkes."
