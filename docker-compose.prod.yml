@@ -2,7 +2,7 @@
 
 services:
   backend:
-  container_name: backend
+    container_name: backend
     build: ./backend
     image: ${BACKEND_IMAGE:-political-dashboard-backend}
     ports:
@@ -14,7 +14,7 @@ services:
       - db
 
   frontend:
-  container_name: frontend
+    container_name: frontend
     build: ./frontend
     image: ${FRONTEND_IMAGE:-political-dashboard-frontend}
     ports:
@@ -23,7 +23,7 @@ services:
       - NODE_ENV=production
 
   db:
-  container_name: db
+    container_name: db
     image: postgres:15-alpine
     restart: always
     ports:
