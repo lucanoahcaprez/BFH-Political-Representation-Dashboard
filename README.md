@@ -61,6 +61,29 @@ Frontend: http://localhost:8080
 Backend API: http://localhost:3000/api
 
 ---
+## Data Synchronization
+
+The backend automatically fetches updated vote data every 4 hours using a cron job.
+
+To manually trigger a data update:
+
+```bash
+docker-compose exec backend npm run update-data
+```
+
+---
+
+## Backup
+
+### Database Backup
+
+Create a snapshot of the PostgreSQL data:
+
+```bash
+docker-compose exec db pg_dump -U postgres political_dashboard > backup.sql
+```
+
+---
 
 ## Data Source
 
