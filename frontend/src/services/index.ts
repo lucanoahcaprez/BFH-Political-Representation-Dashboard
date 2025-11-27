@@ -38,7 +38,9 @@ export type KantonaleReprEntry = {
 
 
 
-const REST_BASE_URL = 'http://localhost:3000/api/diagram';
+const API_BASE_URL =
+    (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? '';
+const REST_BASE_URL = `${API_BASE_URL}/api/diagram`;
 export function getEmpfehlungen_vs_Volk(): Promise<EmpfehlungenEntry[]> {
     return ajax('/empfehlungen-vs-volk', {
         method: 'GET',
