@@ -1,0 +1,93 @@
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$EnvFile = Join-Path (Get-Location) '.env.deploy'
+
+function Prompt-Value {
+  param(
+    [Parameter(Mandatory = $true)][string]$Message,
+    [string]$Default = $null
+  )
+
+  $prompt = if ($null -ne $Default -and $Default -ne '') { "$Message [$Default]" } else { $Message }
+  $input = Read-Host -Prompt $prompt
+  if ([string]::IsNullOrWhiteSpace($input) -and $null -ne $Default) { return $Default }
+  return $input
+}
+
+function Mask-Value {
+  param([string]$Name, [string]$Value)
+  if ($Name -match 'PASSWORD' -or $Name -match 'SECRET' -or $Name -match 'TOKEN') {
+    if ($Value.Length -le 4) { return '****' }
+    return ('*' * ([Math]::Max(4, $Value.Length - 2))) + $Value.Substring($Value.Length - 2)
+  }
+  return $Value
+}
+
+# Collect values
+$APP_DOMAIN = Prompt-Value -Message 'Domain (empty or localhost for http://localhost)' -Default ''
+$FRONTEND_PORT = Prompt-Value -Message 'Frontend port' -Default '8080'
+$BACKEND_PORT = Prompt-Value -Message 'Backend port' -Default '3000'
+$DB_PORT = Prompt-Value -Message 'Database port' -Default '5432'
+$POSTGRES_USER = Prompt-Value -Message 'Postgres user' -Default 'postgres'
+
+do {
+  $POSTGRES_PASSWORD = Prompt-Value -Message 'Postgres password'
+  if ([string]::IsNullOrWhiteSpace($POSTGRES_PASSWORD)) {
+    Write-Host 'Password cannot be empty. Please enter a value.'
+  }
+} until (-not [string]::IsNullOrWhiteSpace($POSTGRES_PASSWORD))
+
+$POSTGRES_DB = 'political_dashboard'
+$DATABASE_URL = "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+$FRONTEND_IMAGE = 'political-dashboard-frontend'
+$BACKEND_IMAGE = 'political-dashboard-backend'
+
+$values = [ordered]@{
+  APP_DOMAIN        = $APP_DOMAIN
+  FRONTEND_PORT     = $FRONTEND_PORT
+  BACKEND_PORT      = $BACKEND_PORT
+  DB_PORT           = $DB_PORT
+  POSTGRES_USER     = $POSTGRES_USER
+  POSTGRES_PASSWORD = $POSTGRES_PASSWORD
+  POSTGRES_DB       = $POSTGRES_DB
+  DATABASE_URL      = $DATABASE_URL
+  FRONTEND_IMAGE    = $FRONTEND_IMAGE
+  BACKEND_IMAGE     = $BACKEND_IMAGE
+}
+
+Write-Host "`nSummary:"
+foreach ($entry in $values.GetEnumerator()) {
+  $val = if ($null -eq $entry.Value) { '' } else { $entry.Value }
+  Write-Host ("  {0} = {1}" -f $entry.Key, (Mask-Value -Name $entry.Key -Value $val))
+}
+
+$confirm = Read-Host -Prompt "`nWrite to .env.deploy? [y/N]"
+if ($confirm -notmatch '^(?i:y(es)?)$') {
+  Write-Host 'Aborted. No file written.'
+  exit 0
+}
+
+if (Test-Path $EnvFile) {
+  $overwrite = Read-Host -Prompt ".env.deploy already exists. Overwrite? [y/N]"
+  if ($overwrite -notmatch '^(?i:y(es)?)$') {
+    Write-Host 'Aborted. Existing file left untouched.'
+    exit 0
+  }
+}
+
+$content = @"
+APP_DOMAIN=$APP_DOMAIN
+FRONTEND_PORT=$FRONTEND_PORT
+BACKEND_PORT=$BACKEND_PORT
+DB_PORT=$DB_PORT
+POSTGRES_USER=$POSTGRES_USER
+POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+POSTGRES_DB=$POSTGRES_DB
+DATABASE_URL=$DATABASE_URL
+FRONTEND_IMAGE=$FRONTEND_IMAGE
+BACKEND_IMAGE=$BACKEND_IMAGE
+"@
+
+Set-Content -Path $EnvFile -Value $content -Encoding UTF8
+Write-Host ".env.deploy written to $EnvFile"
