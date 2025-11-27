@@ -4,15 +4,17 @@ set -euo pipefail
 : "${REMOTE_DIR:?REMOTE_DIR must be set}"
 
 log() {
-    local msg="[prepare_remote] $*"
-    printf '%s\n' "$msg"
-    if [ -n "${LOG_FILE:-}" ] && [ -d "${LOG_DIR:-}" ]; then
-        if [ -n "$SUDO" ]; then
-        printf '%s\n' "$msg" | $SUDO tee -a "$LOG_FILE" >/dev/null || true
-        else
-        printf '%s\n' "$msg" >> "$LOG_FILE" 2>/dev/null || true
-        fi
+  local ts msg
+  ts="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+  msg="[$ts] [prepare_remote] $*"
+  printf '%s\n' "$msg"
+  if [ -n "${LOG_FILE:-}" ] && [ -d "${LOG_DIR:-}" ]; then
+    if [ -n "$SUDO" ]; then
+      printf '%s\n' "$msg" | $SUDO tee -a "$LOG_FILE" >/dev/null || true
+    else
+      printf '%s\n' "$msg" >> "$LOG_FILE" 2>/dev/null || true
     fi
+  fi
 }
 
 REMOTE_USER="$(id -un)"
@@ -50,20 +52,19 @@ apt_install() {
     $SUDO DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
 }
 
+ensure_pkg() {
+  local pkg="$1"
+  local check_bin="${2:-$1}"
+  if command -v "$check_bin" >/dev/null 2>&1; then
+    return
+  fi
+  log "Installing ${pkg}"
+  apt_install "$pkg"
+}
+
 ensure_base_packages() {
-    # git
-    if command -v git >/dev/null 2>&1; then
-        return
-    fi
-    log "Installing git"
-    apt_install git
-    
-    # curl
-    if command -v curl >/dev/null 2>&1; then
-        return
-    fi
-    log "Installing curl"
-    apt_install curl
+  ensure_pkg git git
+  ensure_pkg curl curl
 }
 
 ensure_directory() {
@@ -122,19 +123,28 @@ detect_compose_cmd() {
     }
 
 main() {
+    log "starting preparation"
     ensure_log_dir
 
+    log "ensuring ${REMOTE_DIR} exists"
     ensure_directory "$REMOTE_DIR"
+    log "ensuring ${REMOTE_DIR}.state exists"
     ensure_directory "$REMOTE_DIR/.state"
+    log "ensuring ${REMOTE_DIR} is owned by ${REMOTE_USER}"
     ensure_owned_by_user "$REMOTE_DIR"
 
+    log "ensuring base packages are installed"
     ensure_base_packages
+    log "ensuring docker is installed"
     ensure_docker
+    log "ensuring compose is installed"
     ensure_compose
 
     compose_cmd="$(detect_compose_cmd)"
     printf "DOCKER_COMPOSE_CMD='%s'\n" "$compose_cmd" > "$REMOTE_DIR/.compose_cmd"
     ensure_owned_by_user "$REMOTE_DIR/.compose_cmd"
+
+    log "ended preparation"
 }
 
 main "$@"
