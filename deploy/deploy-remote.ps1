@@ -158,7 +158,7 @@ $createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
 & $createEnv
 
 # 7) Ask deployment method (placeholder)
-$method = Read-Choice -Message 'Deployment method? [git|scp|archive]' -Options @('git', 'scp', 'archive')
+$method = Read-Choice -Message 'Deployment method? [local|git|archive]' -Options @('local', 'git', 'archive')
 Write-Info "Selected method: $method"
 
 # 8) Prepare remote host (idempotent)
