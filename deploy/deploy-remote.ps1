@@ -89,28 +89,34 @@ grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/a
 }
 
 # 1) Check dependencies
+Write-Info "Checking dependency on $ENV:COMPUTERNAME"
 Require-Command 'ssh'
 Require-Command 'scp'
 Require-Command 'ssh-keygen'
 
 # 2) Ask for SSH connection details
+Write-Info "Read connection details for ssh"
 $sshhost = Read-Value -Message 'SSH host'
 $portInput = Read-Value -Message 'SSH port' -Default '22'
 $port = [int]$portInput
 $user = Read-Value -Message 'SSH user'
 
 # 3) Ensure keypair locally and install pubkey remotely (one-time password)
+Write-Info "Ensure local sshkey is present"
 $pubKeyPath = Ensure-LocalSshKey
+Write-Info "Try to install public-key on $sshhost"
 Install-PublicKeyRemote -User $user -Server $sshhost -Port $port -PublicKeyPath $pubKeyPath
 
 # 4) Test SSH connectivity (should use key now)
+Write-Info 'Testing ssh connection with key'
 if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port)) {
   Write-Warn 'SSH connection failed after key install. Aborting.'
   exit 1
 }
-Write-Info 'SSH connection via key OK.'
+Write-Success 'SSH connection with key OK.'
 
 # 5) Prompt for further informations
+Write-Info 'Prompting for further informations'
 do {
 $sudoPassword = Read-Secret -Message 'SUDO password'
   if ([string]::IsNullOrWhiteSpace($sudoPassword)) {
@@ -121,6 +127,7 @@ $remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashbo
 
 
 # 6) Create/update local .env.deploy
+Write-Info 'Gather input for creation of .env.deploy'
 $createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
 & $createEnv
 
@@ -146,4 +153,4 @@ $envAssignments = @(
 $remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $envAssignments bash 'prepare_remote.sh'"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $remoteCmd
 
-Write-Host 'Remote preparation complete.' -ForegroundColor Green
+Write-Success 'Remote preparation complete.'

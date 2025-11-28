@@ -21,13 +21,18 @@ function Confirm-Action {
 # Info message to stdout.
 function Write-Info {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Message)
-  Write-Host "[INFO] $($Message -join ' ')"
+  Write-Host "[$(Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")] [INFO] [$ENV:COMPUTERNAME] $($Message -join ' ')"
 }
 
+# success message
+function Write-Success {
+  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Message)
+  Write-Host "[$(Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")] [SUCCESS] [$ENV:COMPUTERNAME] $($Message -join ' ')" -ForegroundColor Green
+}
 # Warning message to stderr with standard formatting.
 function Write-Warn {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Message)
-  Write-Warning ($Message -join ' ')
+  Write-Host "[$(Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")] [INFO] [$ENV:COMPUTERNAME] $($Message -join ' ')" -ForegroundColor Yellow
 }
 
 # Prompt with optional default value.
@@ -46,8 +51,7 @@ function Read-Value {
 # Prompt with masked values
 function Read-Secret {
   param([Parameter(Mandatory = $true)][string]$Message)
-  Write-Info "$Message"
-  Write-Host -NoNewline '> '
+  Write-Host "$Message"
   $builder = [System.Text.StringBuilder]::new()
   while ($true) {
     $key = [System.Console]::ReadKey($true)

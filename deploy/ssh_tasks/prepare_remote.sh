@@ -6,7 +6,8 @@ set -euo pipefail
 log() {
   local ts msg
   ts="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-  msg="[$ts] [prepare_remote] $*"
+  host="$(hostname)" 
+  msg="[$ts] [$host] $*"
   printf '%s\n' "$msg"
 
   if [ -n "${LOG_FILE:-}" ] && [ -d "${LOG_DIR:-}" ]; then
