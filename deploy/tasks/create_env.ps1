@@ -1,8 +1,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $scriptDir '..' 'lib' 'ui.ps1')
+# Import helper modules (compatible with Windows PowerShell 5.1 and PowerShell 7)
+. (Join-Path $PSScriptRoot '..\lib\ui.ps1')
 
 $EnvFile = Join-Path (Get-Location) '.env.deploy'
 
@@ -16,14 +16,14 @@ function Mask-Value {
 }
 
 # Collect values
-$APP_DOMAIN = Prompt-Value -Message 'Domain (empty or localhost for http://localhost)' -Default ''
-$FRONTEND_PORT = Prompt-Value -Message 'Frontend port' -Default '8080'
-$BACKEND_PORT = Prompt-Value -Message 'Backend port' -Default '3000'
-$DB_PORT = Prompt-Value -Message 'Database port' -Default '5432'
-$POSTGRES_USER = Prompt-Value -Message 'Postgres user' -Default 'postgres'
+$APP_DOMAIN = Read-Value -Message 'Domain (empty or localhost for http://localhost)' -Default ''
+$FRONTEND_PORT = Read-Value -Message 'Frontend port' -Default '8080'
+$BACKEND_PORT = Read-Value -Message 'Backend port' -Default '3000'
+$DB_PORT = Read-Value -Message 'Database port' -Default '5432'
+$POSTGRES_USER = Read-Value -Message 'Postgres user' -Default 'postgres'
 
 do {
-  $POSTGRES_PASSWORD = Prompt-Value -Message 'Postgres password'
+  $POSTGRES_PASSWORD = Read-Secret -Message 'Postgres password'
   if ([string]::IsNullOrWhiteSpace($POSTGRES_PASSWORD)) {
     Write-Warn 'Password cannot be empty. Please enter a value.'
   }

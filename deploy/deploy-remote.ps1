@@ -1,30 +1,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-. (Join-Path $PSScriptRoot 'lib' 'ssh.ps1')
-. (Join-Path $PSScriptRoot 'lib' 'ui.ps1')
-
-function Read-Secret {
-  param([Parameter(Mandatory = $true)][string]$Prompt)
-  Write-Info "$Prompt"
-  Write-Host -NoNewline '> '
-  $builder = [System.Text.StringBuilder]::new()
-  while ($true) {
-    $key = [System.Console]::ReadKey($true)
-    if ($key.Key -eq 'Enter') { break }
-    if ($key.Key -eq 'Backspace') {
-      if ($builder.Length -gt 0) {
-        $builder.Length -= 1
-        Write-Host -NoNewline "`b `b"
-      }
-      continue
-    }
-    $null = $builder.Append($key.KeyChar)
-    Write-Host -NoNewline '*'
-  }
-  Write-Host
-  return $builder.ToString()
-}
+# Import helper modules (compatible with Windows PowerShell 5.1 and PowerShell 7)
+. (Join-Path $PSScriptRoot 'lib\ssh.ps1')
+. (Join-Path $PSScriptRoot 'lib\ui.ps1')
 
 function Escape-SingleQuote {
   param([Parameter(Mandatory = $true)][string]$Text)
@@ -115,12 +94,10 @@ Require-Command 'scp'
 Require-Command 'ssh-keygen'
 
 # 2) Ask for SSH connection details
-$sshhost = Prompt-Value -Message 'SSH host'
-$portInput = Prompt-Value -Message 'SSH port' -Default '22'
+$sshhost = Read-Value -Message 'SSH host'
+$portInput = Read-Value -Message 'SSH port' -Default '22'
 $port = [int]$portInput
-$user = Read-Prompt -Message 'SSH user'
-$password = Read-Secret -Prompt 'SSH password (used once; then key auth)'
-$remoteDir = Prompt-Value -Message 'Remote deploy directory [/opt/political-dashboard]' -Default '/opt/political-dashboard'
+$user = Read-Value -Message 'SSH user'
 
 # 3) Ensure keypair locally and install pubkey remotely (one-time password)
 $pubKeyPath = Ensure-LocalSshKey
@@ -133,30 +110,40 @@ if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port)) {
 }
 Write-Info 'SSH connection via key OK.'
 
-# 5) Create/update local .env.deploy
-$createEnv = Join-Path $PSScriptRoot 'tasks' 'create_env.ps1'
+# 5) Prompt for further informations
+do {
+$sudoPassword = Read-Secret -Message 'SUDO password'
+  if ([string]::IsNullOrWhiteSpace($sudoPassword)) {
+    Write-Warn 'Password cannot be empty. Please enter a value.'
+  }
+} until (-not [string]::IsNullOrWhiteSpace($sudoPassword))
+$remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashboard]' -Default '/opt/political-dashboard'
+
+
+# 6) Create/update local .env.deploy
+$createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
 & $createEnv
 
-# 6) Ask deployment method (placeholder)
+# 7) Ask deployment method (placeholder)
 $method = Read-Prompt -Message 'Deployment method? [git|rsync|archive]'
 Write-Info "Selected method: $method"
 
-# 7) Prepare remote host (idempotent)
+# 8) Prepare remote host (idempotent)
 $remoteTasksDir = "/tmp/pol-dashboard-tasks"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script "mkdir -p '$remoteTasksDir'"
 
-$prepScriptPath = Join-Path $PSScriptRoot 'ssh_tasks' 'prepare_remote.sh'
+$prepScriptPath = Join-Path $PSScriptRoot 'ssh_tasks\prepare_remote.sh'
 $remotePrepPath = "$remoteTasksDir/prepare_remote.sh"
 Copy-RemoteScript -LocalPath $prepScriptPath -RemotePath $remotePrepPath -User $user -Server $sshhost -Port $port
 
 $envAssignments = @(
   "REMOTE_DIR='$(Escape-SingleQuote $remoteDir)'"
   'SUDO=''sudo -S -p ""'''
-  "SUDO_PASSWORD='$(Escape-SingleQuote $sudoPwdEscaped)'"
+  "SUDO_PASSWORD='$(Escape-SingleQuote $sudoPassword)'"
 ) -join ' '
 
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
-$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' | $envAssignments bash 'prepare_remote.sh'"
+$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $envAssignments bash 'prepare_remote.sh'"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $remoteCmd
 
 Write-Host 'Remote preparation complete.' -ForegroundColor Green

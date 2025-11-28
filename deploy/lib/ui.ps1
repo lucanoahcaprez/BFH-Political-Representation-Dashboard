@@ -31,7 +31,7 @@ function Write-Warn {
 }
 
 # Prompt with optional default value.
-function Prompt-Value {
+function Read-Value {
   param(
     [Parameter(Mandatory = $true)][string]$Message,
     [string]$Default = $null
@@ -41,4 +41,27 @@ function Prompt-Value {
   $input = Read-Host -Prompt $prompt
   if ([string]::IsNullOrWhiteSpace($input) -and $null -ne $Default) { return $Default }
   return $input
+}
+
+# Prompt with masked values
+function Read-Secret {
+  param([Parameter(Mandatory = $true)][string]$Message)
+  Write-Info "$Message"
+  Write-Host -NoNewline '> '
+  $builder = [System.Text.StringBuilder]::new()
+  while ($true) {
+    $key = [System.Console]::ReadKey($true)
+    if ($key.Key -eq 'Enter') { break }
+    if ($key.Key -eq 'Backspace') {
+      if ($builder.Length -gt 0) {
+        $builder.Length -= 1
+        Write-Host -NoNewline "`b `b"
+      }
+      continue
+    }
+    $null = $builder.Append($key.KeyChar)
+    Write-Host -NoNewline '*'
+  }
+  Write-Host
+  return $builder.ToString()
 }
