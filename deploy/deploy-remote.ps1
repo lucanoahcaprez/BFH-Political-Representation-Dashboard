@@ -2,10 +2,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'lib' 'ssh.ps1')
+. (Join-Path $PSScriptRoot 'lib' 'ui.ps1')
 
 function Read-Secret {
   param([Parameter(Mandatory = $true)][string]$Prompt)
-  Write-Host -NoNewline "$Prompt : "
+  Write-Info "$Prompt"
+  Write-Host -NoNewline '> '
   $builder = [System.Text.StringBuilder]::new()
   while ($true) {
     $key = [System.Console]::ReadKey($true)
@@ -113,12 +115,12 @@ Require-Command 'scp'
 Require-Command 'ssh-keygen'
 
 # 2) Ask for SSH connection details
-$sshhost = Read-Host -Prompt 'SSH host'
-$portInput = Read-Host -Prompt 'SSH port [22]'
-if ([string]::IsNullOrWhiteSpace($portInput)) { $port = 22 } else { $port = [int]$portInput }
-$user = Read-Host -Prompt 'SSH user'
+$sshhost = Read-Prompt -Message 'SSH host'
+$portInput = Prompt-Value -Message 'SSH port' -Default '22'
+$port = [int]$portInput
+$user = Read-Prompt -Message 'SSH user'
 $password = Read-Secret -Prompt 'SSH password (used once; then key auth)'
-$remoteDir = Read-Host -Prompt 'Remote deploy directory (e.g., /opt/political-dashboard)'
+$remoteDir = Prompt-Value -Message 'Remote deploy directory [/opt/political-dashboard]' -Default '/opt/political-dashboard'
 
 # 3) Ensure keypair locally and install pubkey remotely (one-time password)
 $pubKeyPath = Ensure-LocalSshKey
@@ -126,18 +128,18 @@ Install-PublicKeyRemote -User $user -Server $sshhost -Port $port -PublicKeyPath 
 
 # 4) Test SSH connectivity (should use key now)
 if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port)) {
-  Write-Host 'SSH connection failed after key install. Aborting.' -ForegroundColor Red
+  Write-Warn 'SSH connection failed after key install. Aborting.'
   exit 1
 }
-Write-Host 'SSH connection via key OK.' -ForegroundColor Green
+Write-Info 'SSH connection via key OK.'
 
 # 5) Create/update local .env.deploy
 $createEnv = Join-Path $PSScriptRoot 'tasks' 'create_env.ps1'
 & $createEnv
 
 # 6) Ask deployment method (placeholder)
-$method = Read-Host -Prompt 'Deployment method? [git|rsync|archive]'
-Write-Host "Selected method: $method"
+$method = Read-Prompt -Message 'Deployment method? [git|rsync|archive]'
+Write-Info "Selected method: $method"
 
 # 7) Prepare remote host (idempotent)
 $remoteTasksDir = "/tmp/pol-dashboard-tasks"

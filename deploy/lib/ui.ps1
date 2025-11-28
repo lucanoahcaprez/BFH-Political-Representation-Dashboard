@@ -29,3 +29,16 @@ function Write-Warn {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Message)
   Write-Warning ($Message -join ' ')
 }
+
+# Prompt with optional default value.
+function Prompt-Value {
+  param(
+    [Parameter(Mandatory = $true)][string]$Message,
+    [string]$Default = $null
+  )
+
+  $prompt = if ($null -ne $Default -and $Default -ne '') { "$Message [$Default]" } else { $Message }
+  $input = Read-Host -Prompt $prompt
+  if ([string]::IsNullOrWhiteSpace($input) -and $null -ne $Default) { return $Default }
+  return $input
+}

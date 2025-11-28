@@ -1,19 +1,10 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $scriptDir '..' 'lib' 'ui.ps1')
+
 $EnvFile = Join-Path (Get-Location) '.env.deploy'
-
-function Prompt-Value {
-  param(
-    [Parameter(Mandatory = $true)][string]$Message,
-    [string]$Default = $null
-  )
-
-  $prompt = if ($null -ne $Default -and $Default -ne '') { "$Message [$Default]" } else { $Message }
-  $input = Read-Host -Prompt $prompt
-  if ([string]::IsNullOrWhiteSpace($input) -and $null -ne $Default) { return $Default }
-  return $input
-}
 
 function Mask-Value {
   param([string]$Name, [string]$Value)
@@ -34,7 +25,7 @@ $POSTGRES_USER = Prompt-Value -Message 'Postgres user' -Default 'postgres'
 do {
   $POSTGRES_PASSWORD = Prompt-Value -Message 'Postgres password'
   if ([string]::IsNullOrWhiteSpace($POSTGRES_PASSWORD)) {
-    Write-Host 'Password cannot be empty. Please enter a value.'
+    Write-Warn 'Password cannot be empty. Please enter a value.'
   }
 } until (-not [string]::IsNullOrWhiteSpace($POSTGRES_PASSWORD))
 
@@ -56,22 +47,22 @@ $values = [ordered]@{
   BACKEND_IMAGE     = $BACKEND_IMAGE
 }
 
-Write-Host "`nSummary:"
+Write-Info "`nSummary:"
 foreach ($entry in $values.GetEnumerator()) {
   $val = if ($null -eq $entry.Value) { '' } else { $entry.Value }
   Write-Host ("  {0} = {1}" -f $entry.Key, (Mask-Value -Name $entry.Key -Value $val))
 }
 
-$confirm = Read-Host -Prompt "`nWrite to .env.deploy? [y/N]"
-if ($confirm -notmatch '^(?i:y(es)?)$') {
-  Write-Host 'Aborted. No file written.'
+$confirm = Confirm-Action -Message "`nWrite to .env.deploy?"
+if (-not $confirm) {
+  Write-Warn 'Aborted. No file written.'
   exit 0
 }
 
 if (Test-Path $EnvFile) {
-  $overwrite = Read-Host -Prompt ".env.deploy already exists. Overwrite? [y/N]"
-  if ($overwrite -notmatch '^(?i:y(es)?)$') {
-    Write-Host 'Aborted. Existing file left untouched.'
+  $overwrite = Confirm-Action -Message ".env.deploy already exists. Overwrite?"
+  if (-not $overwrite) {
+    Write-Warn 'Aborted. Existing file left untouched.'
     exit 0
   }
 }
@@ -90,4 +81,4 @@ BACKEND_IMAGE=$BACKEND_IMAGE
 "@
 
 Set-Content -Path $EnvFile -Value $content -Encoding UTF8
-Write-Host ".env.deploy written to $EnvFile"
+Write-Info ".env.deploy written to $EnvFile"
