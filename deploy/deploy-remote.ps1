@@ -168,15 +168,15 @@ Invoke-SshScript -User $user -Server $sshhost -Port $port -Script "mkdir -p '$re
 $prepScriptPath = Join-Path $PSScriptRoot 'ssh_tasks\prepare_remote.sh'
 $remotePrepPath = "$remoteTasksDir/prepare_remote.sh"
 Copy-RemoteScript -LocalPath $prepScriptPath -RemotePath $remotePrepPath -User $user -Server $sshhost -Port $port
-
-$envAssignments = @(
+ 
+$prepEnvAssignments = @(
   "REMOTE_DIR='$(Escape-SingleQuote $remoteDir)'"
   'SUDO=''sudo -S -p ""'''
   "SUDO_PASSWORD='$(Escape-SingleQuote $sudoPassword)'"
 ) -join ' '
 
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
-$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $envAssignments bash 'prepare_remote.sh'"
+$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh'"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $remoteCmd
 
 Write-Success 'Remote preparation complete.'
@@ -190,5 +190,20 @@ $syncContext = @{
   RemoteDir  = $remoteDir
   DeployRoot = $PSScriptRoot
 }
-Invoke-DeploymentSync -Method $method -Context $syncContext
+# Invoke-DeploymentSync -Method $method -Context $syncContext
 Write-Success "Sync via '$method' completed."
+
+# 10) Deploy application on remote host
+$deployScriptPath = Join-Path $PSScriptRoot 'ssh_tasks\deploy.sh'
+$remoteDeployPath = "$remoteTasksDir/deploy.sh"
+Copy-RemoteScript -LocalPath $deployScriptPath -RemotePath $remoteDeployPath -User $user -Server $sshhost -Port $port
+
+$deployEnvAssignments = @(
+  "REMOTE_DIR='$(Escape-SingleQuote $remoteDir)'"
+  'SUDO=''sudo -S -p ""'''
+  "SUDO_PASSWORD='$(Escape-SingleQuote $sudoPassword)'"
+) -join ' '
+
+$deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"
+Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $deployCmd
+Write-Success 'Remote deploy executed.'
