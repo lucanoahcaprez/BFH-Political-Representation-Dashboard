@@ -82,3 +82,4 @@ BACKEND_IMAGE=$BACKEND_IMAGE
 
 Set-Content -Path $EnvFile -Value $content -Encoding UTF8
 Write-Info ".env.deploy written to $EnvFile"
+return $EnvFile

@@ -32,7 +32,7 @@ function Write-LogLine {
     [bool]$ForceConsole = $false
   )
 
-  $line = "[$(Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")] [$Level] [$ENV:COMPUTERNAME] $Message"
+  $line = "[$(Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")] [$ENV:COMPUTERNAME] [$Level] $Message"
   if ($script:UiLogFile) {
     Add-Content -Path $script:UiLogFile -Value $line
   }

@@ -47,12 +47,16 @@ function Invoke-SyncStrategy {
     $localRoot = $resolved
   } until ($localRoot)
 
-  $requiredItems = @('backend', 'frontend', 'docker-compose.yml', 'docker-compose.prod.yml', '.env.deploy')
+  $requiredItems = @('backend', 'frontend', 'docker-compose.yml', 'docker-compose.prod.yml')
   foreach ($item in $requiredItems) {
     $path = Join-Path $localRoot $item
     if (-not (Test-Path $path)) {
-      Throw-Die "Required item missing at $path"
+      Throw-Die "Required item missing ($item) at $path"
     }
+  }
+  # also check for global defined env file
+  if(-not (Test-Path $global:EnvFile)){
+      Throw-Die "Required item missing (.env.deploy) at $global:EnvFile)"
   }
 
   $remoteDir = $Context.RemoteDir
@@ -83,7 +87,7 @@ function Invoke-SyncStrategy {
     Copy-WithExcludeNodeModules -Source (Join-Path $localRoot 'frontend') -Destination (Join-Path $staging 'frontend')
     Copy-Item -Path (Join-Path $localRoot 'docker-compose.yml') -Destination $staging -Force
     Copy-Item -Path (Join-Path $localRoot 'docker-compose.prod.yml') -Destination $staging -Force
-    Copy-Item -Path (Join-Path $localRoot '.env.deploy') -Destination $staging -Force
+    Copy-Item -Path $global:EnvFile -Destination $staging -Force
 
     $destination = "$sshTarget`:$remoteDir/"
     $scpArgs = @(

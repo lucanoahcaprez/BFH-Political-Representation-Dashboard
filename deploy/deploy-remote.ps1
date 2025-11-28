@@ -20,6 +20,41 @@ function Escape-SingleQuote {
   return $Text -replace "'", $replacement
 }
 
+function Read-EnvDeployValues {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $result = @{}
+  if (-not (Test-Path $Path)) { return $result }
+  foreach ($line in Get-Content -Path $Path) {
+    if ($line -match '^\s*$' -or $line -match '^\s*#') { continue }
+    $parts = $line.Split('=', 2, [System.StringSplitOptions]::None)
+    if ($parts.Count -eq 2) {
+      $key = $parts[0].Trim()
+      $val = $parts[1].Trim()
+      if ($key) { $result[$key] = $val }
+    }
+  }
+  return $result
+}
+
+function Get-AppUrl {
+  param(
+    [hashtable]$EnvValues,
+    [string]$DefaultFrontendPort = '8080',
+    [string]$Server = $null
+  )
+
+  $domain = $EnvValues['APP_DOMAIN']
+  $frontendPort = if ($EnvValues.ContainsKey('FRONTEND_PORT')) { $EnvValues['FRONTEND_PORT'] } else { $DefaultFrontendPort }
+
+  if ([string]::IsNullOrWhiteSpace($domain) -or $domain -eq 'localhost') {
+    if (-not [string]::IsNullOrWhiteSpace($Server)) {
+      return "http://$Server`:$frontendPort"
+    }
+    return "http://localhost:$frontendPort"
+  }
+  return "https://$domain"
+}
+
 function Get-RemoteScript {
   param([Parameter(Mandatory = $true)][string]$Path)
   $raw = Get-Content -Path $Path -Raw -Encoding UTF8
@@ -164,7 +199,14 @@ $remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashbo
 # 6) Create/update local .env.deploy
 Write-Info 'Gather input for creation of .env.deploy'
 $createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
-& $createEnv
+
+$global:EnvFile = & $createEnv
+$envDeployPath = Join-Path (Get-Location) '.env.deploy'
+if (-not (Test-Path $envDeployPath)) {
+  # Fallback to script root in case the working directory differs.
+  $envDeployPath = Join-Path $PSScriptRoot '.env.deploy'
+}
+$envValues = Read-EnvDeployValues -Path $envDeployPath
 
 # 7) Ask deployment method (placeholder)
 $method = Read-Choice -Message 'Deployment method? [local|git|archive]' -Options @('local', 'git', 'archive')
@@ -199,7 +241,7 @@ $syncContext = @{
   RemoteDir  = $remoteDir
   DeployRoot = $PSScriptRoot
 }
-# Invoke-DeploymentSync -Method $method -Context $syncContext
+Invoke-DeploymentSync -Method $method -Context $syncContext
 Write-Success "Sync via '$method' completed."
 
 # 10) Deploy application on remote host
@@ -216,3 +258,11 @@ $deployEnvAssignments = @(
 $deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $deployCmd
 Write-Success 'Remote deploy executed.'
+
+# 11) Surface useful info to the user
+$remoteLogDir = '/var/log/political-dashboard'
+$appUrl = Get-AppUrl -EnvValues $envValues -Server $sshhost
+
+Write-Success "Local log file: $logFile"
+Write-Success "Remote logs: $remoteLogDir/prepare_remote.log, $remoteLogDir/deploy.log (host: $sshhost)"
+Write-Success "Application URL: $appUrl"
