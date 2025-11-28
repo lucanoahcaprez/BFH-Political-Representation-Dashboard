@@ -48,6 +48,31 @@ function Read-Value {
   return $input
 }
 
+function Read-Choice {
+  param(
+    [Parameter(Mandatory = $true)][string]$Message,
+    [Parameter(Mandatory = $true)][string[]]$Options
+  )
+
+  $validOptions = $Options | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  if (-not $validOptions -or $validOptions.Count -eq 0) {
+    throw "Read-Choice requires at least one non-empty option."
+  }
+  $display = $validOptions -join '|'
+  $inputValidated = $false
+  while (!$inputValidated) {
+    $inputValue = Read-Prompt -Message $Message
+    $inputValue = if ($null -eq $inputValue) { '' } else { $inputValue.Trim() }
+    $match = $validOptions | Where-Object { $_.Equals($inputValue, 'InvariantCultureIgnoreCase') }
+    if ($match) {
+      $inputValidated = $true
+      return $match
+    }else{
+      Write-Warn "Invalid choice. Allowed: $display"
+    }
+  }
+}
+
 # Prompt with masked values
 function Read-Secret {
   param([Parameter(Mandatory = $true)][string]$Message)
