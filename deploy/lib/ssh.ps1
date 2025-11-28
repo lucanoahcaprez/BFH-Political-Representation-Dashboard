@@ -16,12 +16,13 @@ function Test-SshConnection {
 
   $args = @(
     '-p', $Port,
+    '-o', 'PreferredAuthentications=publickey,password',
     '-o', 'ConnectTimeout=10',
     "$User@$Server",
     'exit 0'
   )
 
-  $process = Start-Process -FilePath 'ssh' -ArgumentList $args -NoNewWindow -Wait -PassThru -ErrorAction SilentlyContinue
+  $process = Start-Process -FilePath 'ssh' -ArgumentList $args -NoNewWindow -Wait -PassThru
   return ($process.ExitCode -eq 0)
 }
 
@@ -36,7 +37,7 @@ function Invoke-SshScript {
 
   $args = @(
     '-p', $Port,
-    '-p', $Port,
+    '-o', 'PreferredAuthentications=publickey,password',
     '-o', 'ConnectTimeout=10',
     '-o', 'StrictHostKeyChecking=accept-new',
     "$User@$Server",

@@ -3,7 +3,6 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'lib' 'ssh.ps1')
 
-
 function Read-Secret {
   param([Parameter(Mandatory = $true)][string]$Prompt)
   Write-Host -NoNewline "$Prompt : "
@@ -25,12 +24,9 @@ function Read-Secret {
   return $builder.ToString()
 }
 
-# thank you GPT 5.1
 function Escape-SingleQuote {
   param([Parameter(Mandatory = $true)][string]$Text)
-
-  $replacement = '''"''"'''   # this is the literal 5 chars: ' " ' " '
-
+  $replacement = '''"''"'''   # literal 5 chars: ' " ' " '
   return $Text -replace "'", $replacement
 }
 
@@ -52,7 +48,8 @@ function Copy-RemoteScript {
   $temp = [System.IO.Path]::GetTempFileName()
   try {
     $content = Get-RemoteScript -Path $LocalPath
-    [System.IO.File]::WriteAllText($temp, $content, [System.Text.Encoding]::UTF8)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($temp, $content, $utf8NoBom)
     $args = @(
       '-P', $Port,
       '-o', 'StrictHostKeyChecking=accept-new',
@@ -68,34 +65,81 @@ function Copy-RemoteScript {
   }
 }
 
+function Ensure-LocalSshKey {
+  $keyPath = Join-Path $HOME '.ssh\id_ed25519'
+  if (-not (Test-Path $keyPath)) {
+    Write-Host "Generating SSH key at $keyPath"
+    ssh-keygen -t ed25519 -N '' -f $keyPath | Out-Null
+  }
+  return "$keyPath.pub"
+}
+
+function Install-PublicKeyRemote {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [Parameter(Mandatory = $true)][string]$PublicKeyPath
+  )
+
+  $pubKey = (Get-Content -Path $PublicKeyPath -Raw).TrimEnd("`r","`n")
+  $escapedPub = $pubKey.Replace("'", "''")
+  $remoteCmd = @"
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+touch ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/authorized_keys
+"@
+
+  Write-Host "Installing public key to $User@$Server (password auth will be prompted once)..."
+  $args = @(
+    '-p', $Port,
+    '-o', 'PreferredAuthentications=password',
+    '-o', 'PubkeyAuthentication=no',
+    '-o', 'StrictHostKeyChecking=accept-new',
+    "$User@$Server",
+    $remoteCmd
+  )
+  $proc = Start-Process -FilePath 'ssh' -ArgumentList $args -NoNewWindow -Wait -PassThru
+  if ($proc.ExitCode -ne 0) {
+    Throw-Die "failed to install SSH key (ssh exited with $($proc.ExitCode))"
+  }
+}
+
 # 1) Check dependencies
 Require-Command 'ssh'
 Require-Command 'scp'
+Require-Command 'ssh-keygen'
 
 # 2) Ask for SSH connection details
 $sshhost = Read-Host -Prompt 'SSH host'
 $portInput = Read-Host -Prompt 'SSH port [22]'
 if ([string]::IsNullOrWhiteSpace($portInput)) { $port = 22 } else { $port = [int]$portInput }
 $user = Read-Host -Prompt 'SSH user'
-# $password = Read-Secret -Prompt 'SSH password (not used if keys are set up)'
+$password = Read-Secret -Prompt 'SSH password (used once; then key auth)'
+$remoteDir = Read-Host -Prompt 'Remote deploy directory (e.g., /opt/political-dashboard)'
 
-# 3) Test SSH connectivity
+# 3) Ensure keypair locally and install pubkey remotely (one-time password)
+$pubKeyPath = Ensure-LocalSshKey
+Install-PublicKeyRemote -User $user -Server $sshhost -Port $port -PublicKeyPath $pubKeyPath
+
+# 4) Test SSH connectivity (should use key now)
 if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port)) {
-  Write-Host 'SSH connection failed. Aborting.' -ForegroundColor Red
+  Write-Host 'SSH connection failed after key install. Aborting.' -ForegroundColor Red
   exit 1
 }
-Write-Host 'SSH connection OK.' -ForegroundColor Green
+Write-Host 'SSH connection via key OK.' -ForegroundColor Green
 
-$remoteDir = Read-Host -Prompt 'Remote deploy directory (e.g., /opt/political-dashboard)'
-# 4) Create/update local .env.deploy
+# 5) Create/update local .env.deploy
 $createEnv = Join-Path $PSScriptRoot 'tasks' 'create_env.ps1'
 & $createEnv
 
-# 5) Ask deployment method (placeholder)
+# 6) Ask deployment method (placeholder)
 $method = Read-Host -Prompt 'Deployment method? [git|rsync|archive]'
 Write-Host "Selected method: $method"
 
-# 6) Prepare remote host (idempotent)
+# 7) Prepare remote host (idempotent)
 $remoteTasksDir = "/tmp/pol-dashboard-tasks"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script "mkdir -p '$remoteTasksDir'"
 
@@ -105,9 +149,13 @@ Copy-RemoteScript -LocalPath $prepScriptPath -RemotePath $remotePrepPath -User $
 
 $envAssignments = @(
   "REMOTE_DIR='$(Escape-SingleQuote $remoteDir)'"
+  "TARGET_DIR='$(Escape-SingleQuote $remoteDir)'"
+  "SUDO='sudo -S'"
 ) -join ' '
 
-$remoteCmd = "$envAssignments bash '$remotePrepPath'"
+# Provide sudo password via stdin to avoid interactive prompts (sudo -S)
+$sudoPwdEscaped = Escape-SingleQuote $password
+$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && echo '$sudoPwdEscaped' | SUDO='sudo -S' $envAssignments bash 'prepare_remote.sh'"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $remoteCmd
 
 Write-Host 'Remote preparation complete.' -ForegroundColor Green

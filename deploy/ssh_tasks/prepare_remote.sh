@@ -21,14 +21,18 @@ REMOTE_USER="$(id -un)"
 REMOTE_GROUP="$(id -gn)"
 LOG_DIR="/var/log/political-dashboard"
 LOG_FILE="$LOG_DIR/prepare_remote.log"
-SUDO=""
-if [ "$(id -u)" -eq 0 ]; then
-    SUDO=""
-elif command -v sudo >/dev/null 2>&1; then
-    SUDO="sudo"
+
+if [ -n "${SUDO:-}" ]; then
+    : # honor provided SUDO
 else
-    log "This script requires root or passwordless sudo to install dependencies and adjust ownership" >&2
-    exit 1
+    if [ "$(id -u)" -eq 0 ]; then
+        SUDO=""
+    elif command -v sudo >/dev/null 2>&1; then
+        SUDO="sudo"
+    else
+        log "This script requires root or passwordless sudo to install dependencies and adjust ownership" >&2
+        exit 1
+    fi
 fi
 
 require_apt() {
