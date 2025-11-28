@@ -9,11 +9,9 @@ log() {
   msg="[$ts] [prepare_remote] $*"
   printf '%s\n' "$msg"
   if [ -n "${LOG_FILE:-}" ] && [ -d "${LOG_DIR:-}" ]; then
-    if [ -n "$SUDO" ]; then
-      printf '%s\n' "$msg" | $SUDO tee -a "$LOG_FILE" >/dev/null || true
-    else
-      printf '%s\n' "$msg" >> "$LOG_FILE" 2>/dev/null || true
-    fi
+    # LOG_DIR will be created & chowned to the user in ensure_log_dir,
+    # so no sudo is needed for logging.
+    printf '%s\n' "$msg" >> "$LOG_FILE" 2>/dev/null || true
   fi
 }
 
@@ -22,18 +20,37 @@ REMOTE_GROUP="$(id -gn)"
 LOG_DIR="/var/log/political-dashboard"
 LOG_FILE="$LOG_DIR/prepare_remote.log"
 
-if [ -n "${SUDO:-}" ]; then
-    : # honor provided SUDO
+SUDO_CMD=""
+
+# Sudo handling:
+# - If running as root -> no sudo needed
+# - If not root -> always use sudo -S -p '' and REQUIRE SUDO_PASSWORD
+if [ "$(id -u)" -eq 0 ]; then
+    # Already root, no sudo needed
+    SUDO_CMD=""
+elif command -v sudo >/dev/null 2>&1; then
+    # Non-root: always use sudo with password via stdin
+    SUDO_CMD="sudo -S -p ''"
 else
-    if [ "$(id -u)" -eq 0 ]; then
-        SUDO=""
-    elif command -v sudo >/dev/null 2>&1; then
-        SUDO="sudo"
-    else
-        log "This script requires root or passwordless sudo to install dependencies and adjust ownership" >&2
-        exit 1
-    fi
+    log "This script requires root or sudo to install dependencies and adjust ownership" >&2
+    exit 1
 fi
+
+# If we’re going to use sudo, SUDO_PASSWORD must be provided
+if [ -n "$SUDO_CMD" ] && [ -z "${SUDO_PASSWORD:-}" ]; then
+    log "SUDO_PASSWORD is required for sudo operations" >&2
+    exit 1
+fi
+
+run_cmd() {
+    if [ -z "$SUDO_CMD" ]; then
+        # root: run directly
+        "$@"
+    else
+        # non-root: feed password to sudo via stdin, no prompt
+        printf '%s\n' "$SUDO_PASSWORD" | $SUDO_CMD "$@"
+    fi
+}
 
 require_apt() {
     if ! command -v apt-get >/dev/null 2>&1; then
@@ -45,7 +62,7 @@ require_apt() {
 APT_UPDATED=0
 apt_update_once() {
     if [ "$APT_UPDATED" -eq 0 ]; then
-        $SUDO apt-get update -y
+        run_cmd apt-get update -y
         APT_UPDATED=1
     fi
 }
@@ -53,7 +70,8 @@ apt_update_once() {
 apt_install() {
     require_apt
     apt_update_once
-    $SUDO DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+    # Use env so DEBIAN_FRONTEND is preserved through sudo
+    run_cmd env DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
 }
 
 ensure_pkg() {
@@ -74,18 +92,18 @@ ensure_base_packages() {
 ensure_directory() {
     local dir="$1"
     if ! mkdir -p "$dir" 2>/dev/null; then
-        $SUDO mkdir -p "$dir"
+        run_cmd mkdir -p "$dir"
     fi
 }
 
 ensure_owned_by_user() {
     local path="$1"
-    ${SUDO:+$SUDO }chown -R "$REMOTE_USER:$REMOTE_GROUP" "$path"
+    run_cmd chown -R "$REMOTE_USER:$REMOTE_GROUP" "$path"
 }
 
 ensure_log_dir() {
-    ${SUDO:+$SUDO }mkdir -p "$LOG_DIR"
-    ${SUDO:+$SUDO }chown "$REMOTE_USER:$REMOTE_GROUP" "$LOG_DIR"
+    run_cmd mkdir -p "$LOG_DIR"
+    run_cmd chown "$REMOTE_USER:$REMOTE_GROUP" "$LOG_DIR"
 }
 
 ensure_docker() {
@@ -96,7 +114,7 @@ ensure_docker() {
     apt_install ca-certificates curl gnupg
     apt_install docker.io
     if command -v systemctl >/dev/null 2>&1; then
-        $SUDO systemctl enable --now docker >/dev/null 2>&1 || true
+        run_cmd systemctl enable --now docker >/dev/null 2>&1 || true
     fi
 }
 
@@ -124,7 +142,7 @@ detect_compose_cmd() {
     fi
     log "Docker Compose is not available after attempted installation" >&2
     exit 1
-    }
+}
 
 main() {
     log "starting preparation"

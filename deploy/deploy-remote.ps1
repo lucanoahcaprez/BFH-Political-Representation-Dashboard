@@ -115,7 +115,7 @@ Require-Command 'scp'
 Require-Command 'ssh-keygen'
 
 # 2) Ask for SSH connection details
-$sshhost = Read-Prompt -Message 'SSH host'
+$sshhost = Prompt-Value -Message 'SSH host'
 $portInput = Prompt-Value -Message 'SSH port' -Default '22'
 $port = [int]$portInput
 $user = Read-Prompt -Message 'SSH user'
@@ -151,13 +151,12 @@ Copy-RemoteScript -LocalPath $prepScriptPath -RemotePath $remotePrepPath -User $
 
 $envAssignments = @(
   "REMOTE_DIR='$(Escape-SingleQuote $remoteDir)'"
-  "TARGET_DIR='$(Escape-SingleQuote $remoteDir)'"
-  "SUDO='sudo -S'"
+  'SUDO=''sudo -S -p ""'''
+  "SUDO_PASSWORD='$(Escape-SingleQuote $sudoPwdEscaped)'"
 ) -join ' '
 
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
-$sudoPwdEscaped = Escape-SingleQuote $password
-$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && echo '$sudoPwdEscaped' | SUDO='sudo -S' $envAssignments bash 'prepare_remote.sh'"
+$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' | $envAssignments bash 'prepare_remote.sh'"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $remoteCmd
 
 Write-Host 'Remote preparation complete.' -ForegroundColor Green
