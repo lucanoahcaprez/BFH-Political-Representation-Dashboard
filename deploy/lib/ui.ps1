@@ -20,7 +20,7 @@ function Write-ColoredPrompt {
     [ConsoleColor]$Color = [ConsoleColor]::Cyan
   )
 
-  Write-Host $Message -ForegroundColor $Color -NoNewline
+  Write-Host "$Message`:" -ForegroundColor $Color -NoNewline
   Write-Host ' ' -NoNewline
 }
 
@@ -95,11 +95,10 @@ function Read-Value {
   )
 
   $prompt = if ($null -ne $Default -and $Default -ne '') { "$Message [$Default]" } else { $Message }
-  $color = if ($null -ne $Default -and $Default -ne '') { 'Gray' } else { 'Cyan' }
-  Write-ColoredPrompt -Message $prompt -Color $color
-  $input = Read-Host
-  if ([string]::IsNullOrWhiteSpace($input) -and $null -ne $Default) { return $Default }
-  return $input
+  Write-ColoredPrompt -Message $prompt -Color 'Cyan'
+  $inputValue = Read-Host
+  if ([string]::IsNullOrWhiteSpace($inputValue) -and $null -ne $Default) { return $Default }
+  return $inputValue
 }
 
 function Read-Choice {
