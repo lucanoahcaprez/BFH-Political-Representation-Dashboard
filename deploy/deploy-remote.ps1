@@ -88,6 +88,32 @@ grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/a
   }
 }
 
+function Invoke-DeploymentSync {
+  param(
+    [Parameter(Mandatory = $true)][string]$Method,
+    [Parameter(Mandatory = $true)][hashtable]$Context
+  )
+
+  $strategyPath = Join-Path $PSScriptRoot "sync_strategies\$Method.ps1"
+  if (-not (Test-Path $strategyPath)) {
+    Throw-Die "Unsupported deployment method '$Method' (missing $strategyPath)"
+  }
+
+  # Remove any previously loaded strategy entrypoint to avoid stale definitions.
+  if (Get-Command -Name 'Invoke-SyncStrategy' -CommandType Function -ErrorAction SilentlyContinue) {
+    Remove-Item "function:Invoke-SyncStrategy" -ErrorAction SilentlyContinue
+  }
+
+  . $strategyPath
+
+  $strategyFn = Get-Command -Name 'Invoke-SyncStrategy' -CommandType Function -ErrorAction SilentlyContinue
+  if (-not $strategyFn) {
+    Throw-Die "Sync strategy '$Method' missing entrypoint Invoke-SyncStrategy"
+  }
+
+  Invoke-SyncStrategy -Context $Context
+}
+
 # 1) Check dependencies
 Write-Info "Checking dependency on $ENV:COMPUTERNAME"
 Require-Command 'ssh'
@@ -132,7 +158,7 @@ $createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
 & $createEnv
 
 # 7) Ask deployment method (placeholder)
-$method = Read-Choice -Message 'Deployment method? [git|rsync|archive]' -Options @('git', 'rsync', 'archive')
+$method = Read-Choice -Message 'Deployment method? [git|scp|archive]' -Options @('git', 'scp', 'archive')
 Write-Info "Selected method: $method"
 
 # 8) Prepare remote host (idempotent)
@@ -154,3 +180,15 @@ $remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $envAssign
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $remoteCmd
 
 Write-Success 'Remote preparation complete.'
+
+# 9) Sync project using selected strategy
+$syncContext = @{
+  Method     = $method
+  User       = $user
+  Server     = $sshhost
+  Port       = $port
+  RemoteDir  = $remoteDir
+  DeployRoot = $PSScriptRoot
+}
+Invoke-DeploymentSync -Method $method -Context $syncContext
+Write-Success "Sync via '$method' completed."
