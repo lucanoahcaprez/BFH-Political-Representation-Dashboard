@@ -87,6 +87,13 @@ function Write-Warn {
   Write-LogLine -Level 'WARN' -Message $text -Color 'Yellow' -ForceConsole:$true
 }
 
+function Write-Error {
+  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Message)
+  $text = $Message -join ' '
+  Write-LogLine -Level 'ERROR' -Message $text -Color 'Red' -ForceConsole:$true
+}
+
+
 # Prompt with optional default value.
 function Read-Value {
   param(

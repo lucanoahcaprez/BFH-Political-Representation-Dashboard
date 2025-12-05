@@ -113,7 +113,9 @@ grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/a
   )
   $proc = Start-Process -FilePath 'ssh' -ArgumentList $args -NoNewWindow -Wait -PassThru
   if ($proc.ExitCode -ne 0) {
-    Throw-Die "failed to install SSH key (ssh exited with $($proc.ExitCode))"
+    $message = "failed to install SSH key (ssh exited with $($proc.ExitCode))"
+    Write-Error $message
+    Throw-Die $message
   }
 }
 
@@ -223,7 +225,7 @@ Install-PublicKeyRemote -User $user -Server $sshhost -Port $port -PublicKeyPath 
 # 4) Test SSH connectivity (should use key now)
 Write-Info 'Testing ssh connection with key'
 if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port)) {
-  Write-Warn 'SSH connection failed after key install. Aborting.'
+  Write-Error 'SSH connection failed after key install. Aborting.'
   exit 1
 }
 Write-Success 'SSH connection with key OK.'
@@ -272,7 +274,7 @@ if (-not (Test-Path $envDeployPath)) {
 $envValues = Read-EnvDeployValues -Path $envDeployPath
 
 # 8) Ask deployment method (placeholder)
-$method = Read-Choice -Message 'Deployment method? [local|git|archive]' -Options @('local', 'git', 'archive')
+$method = Read-Choice -Message 'Deployment method? [local|git]' -Options @('local', 'git', 'archive')
 Write-Info "Selected method: $method"
 
 $hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
