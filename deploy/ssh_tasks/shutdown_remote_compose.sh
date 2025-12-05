@@ -3,6 +3,11 @@ set -euo pipefail
 
 : "${REMOTE_DIR:?REMOTE_DIR must be set}"
 
+# Default to sudo if available and not explicitly provided.
+if [ -z "${SUDO_CMD:-}" ] && command -v sudo >/dev/null 2>&1; then
+  SUDO_CMD="sudo -S -p ''"
+fi
+
 run_cmd() {
   if [ -n "${SUDO_CMD:-}" ]; then
     if [ -n "${SUDO_PASSWORD:-}" ]; then

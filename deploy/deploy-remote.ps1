@@ -175,11 +175,10 @@ function Stop-RemoteCompose {
   if ($SudoPassword) { $envAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $SudoPassword)'" }
   $envPrefix = $envAssignments -join ' '
   $shutdownCmd = "cd '$RemoteTasksDir' && chmod +x '$shutdownScriptName' && $envPrefix bash '$shutdownScriptName'"
-  Write-Host $shutdownCmd
   Invoke-SshScript -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $shutdownCmd
 }
 
-function Validate-RemoteSudo {
+function Test-RemoteSudo {
   param(
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
@@ -298,7 +297,7 @@ do {
     Write-Warn 'Password cannot be empty. Please enter a value.'
   }
 } until (-not [string]::IsNullOrWhiteSpace($sudoPassword))
-$sudoPassword = Validate-RemoteSudo -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -SudoPassword $sudoPassword
+$sudoPassword = Test-RemoteSudo -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -SudoPassword $sudoPassword
 Write-Success "SUDO password ok."
 
 # 7) Prompt for remote directory and optional shutdown
@@ -313,7 +312,7 @@ if ($Shutdown) {
   
   if ($hasCompose) {
     Write-Info "Stopping existing docker-compose stack in $remoteDir"
-    Stop-RemoteCompose -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+    Stop-RemoteCompose -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir -SudoPassword $sudoPassword
     Write-Success "Remote docker-compose stack stopped."
     
   } else {
