@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-  [switch]$Shutdown
+  [switch]$Shutdown,
+  [int]$ConnectTimeoutSeconds = 20,
+  [int]$ConnectDelaySeconds = 1
 )
 
 Set-StrictMode -Version Latest
@@ -62,7 +64,8 @@ function Copy-RemoteScript {
     [Parameter(Mandatory = $true)][string]$RemotePath,
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
-    [int]$Port = 22
+    [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20
   )
 
   $temp = [System.IO.Path]::GetTempFileName()
@@ -73,6 +76,7 @@ function Copy-RemoteScript {
     $args = @(
       '-P', $Port,
       '-o', 'StrictHostKeyChecking=accept-new',
+      '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
       $temp,
       "$User@$Server`:$RemotePath"
     )
@@ -90,6 +94,7 @@ function Install-PublicKeyRemote {
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
     [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$PublicKeyPath
   )
 
@@ -108,6 +113,7 @@ grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/a
     '-o', 'PreferredAuthentications=password',
     '-o', 'PubkeyAuthentication=no',
     '-o', 'StrictHostKeyChecking=accept-new',
+    '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
     "$User@$Server",
     $remoteCmd
   )
@@ -124,10 +130,11 @@ function Ensure-RemoteTasksDir {
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
     [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$RemoteTasksDir
   )
 
-  Invoke-SshScript -User $User -Server $Server -Port $Port -Script "mkdir -p '$RemoteTasksDir'"
+  Invoke-SshScript -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script "mkdir -p '$RemoteTasksDir'"
 }
 
 function Ensure-ComposeHelperScripts {
@@ -135,13 +142,14 @@ function Ensure-ComposeHelperScripts {
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
     [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$RemoteTasksDir
   )
 
   $remoteCheckPath = "$RemoteTasksDir/$checkScriptName"
   $remoteShutdownPath = "$RemoteTasksDir/$shutdownScriptName"
-  Copy-RemoteScript -LocalPath $localCheckScript -RemotePath $remoteCheckPath -User $User -Server $Server -Port $Port
-  Copy-RemoteScript -LocalPath $localShutdownScript -RemotePath $remoteShutdownPath -User $User -Server $Server -Port $Port
+  Copy-RemoteScript -LocalPath $localCheckScript -RemotePath $remoteCheckPath -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds
+  Copy-RemoteScript -LocalPath $localShutdownScript -RemotePath $remoteShutdownPath -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds
 }
 
 function Test-RemoteComposePresent {
@@ -149,12 +157,13 @@ function Test-RemoteComposePresent {
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
     [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
     [Parameter(Mandatory = $true)][string]$RemoteDir
   )
 
   $checkCmd = "cd '$RemoteTasksDir' && chmod +x '$checkScriptName' && REMOTE_DIR='$(Escape-SingleQuote $RemoteDir)' bash '$checkScriptName'"
-  $output = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -Script $checkCmd
+  $output = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $checkCmd
   return ($output -match 'present')
 }
 
@@ -163,6 +172,7 @@ function Stop-RemoteCompose {
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
     [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
     [Parameter(Mandatory = $true)][string]$RemoteDir,
     [string]$SudoCmd = $null,
@@ -174,7 +184,7 @@ function Stop-RemoteCompose {
   if ($SudoPassword) { $envAssignments += "SUDO_PASSWORD='$(Escape-SingleQuote $SudoPassword)'" }
   $envPrefix = $envAssignments -join ' '
   $shutdownCmd = "cd '$RemoteTasksDir' && chmod +x '$shutdownScriptName' && $envPrefix bash '$shutdownScriptName'"
-  Invoke-SshScript -User $User -Server $Server -Port $Port -Script $shutdownCmd
+  Invoke-SshScript -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $shutdownCmd
 }
 
 function Invoke-DeploymentSync {
@@ -220,30 +230,37 @@ $user = Read-Value -Message 'SSH user'
 Write-Info "Ensure local sshkey is present"
 $pubKeyPath = Ensure-LocalSshKey
 Write-Info "Try to install public-key on $sshhost"
-Install-PublicKeyRemote -User $user -Server $sshhost -Port $port -PublicKeyPath $pubKeyPath
+Install-PublicKeyRemote -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -PublicKeyPath $pubKeyPath
+Start-Sleep -Seconds $ConnectDelaySeconds
 
 # 4) Test SSH connectivity (should use key now)
 Write-Info 'Testing ssh connection with key'
-if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port)) {
+if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds)) {
   Write-Error 'SSH connection failed after key install. Aborting.'
   exit 1
 }
+Start-Sleep -Seconds $ConnectDelaySeconds
 Write-Success 'SSH connection with key OK.'
 
 # 5) Prompt for remote directory and optional shutdown
 $remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashboard]' -Default '/opt/political-dashboard'
 
 Write-Info "Prepare remote helper directory $remoteTasksDir"
+
 Ensure-RemoteTasksDir -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir
-Ensure-ComposeHelperScripts -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir
+Start-Sleep -Seconds $ConnectDelaySeconds
+Ensure-ComposeHelperScripts -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir
+Start-Sleep -Seconds $ConnectDelaySeconds
 
 if ($Shutdown) {
   Write-Info "Checking for existing docker-compose files in $remoteDir"
-  $hasCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+  $hasCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+  Start-Sleep -Seconds $ConnectDelaySeconds
   if ($hasCompose) {
     Write-Info "Stopping existing docker-compose stack in $remoteDir"
-    Stop-RemoteCompose -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+    Stop-RemoteCompose -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
     Write-Success "Remote docker-compose stack stopped."
+    Start-Sleep -Seconds $ConnectDelaySeconds
   } else {
     Write-Info "No docker-compose files found in $remoteDir"
   }
@@ -277,7 +294,8 @@ $envValues = Read-EnvDeployValues -Path $envDeployPath
 $method = Read-Choice -Message 'Deployment method? [local|git]' -Options @('local', 'git', 'archive')
 Write-Info "Selected method: $method"
 
-$hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+$hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+Start-Sleep -Seconds $ConnectDelaySeconds
 if ($hasExistingCompose) {
   $action = Read-Choice -Message "Existing docker-compose found in $remoteDir. [redeploy|cancel]" -Options @('redeploy', 'cancel')
   if ($action -eq 'cancel') {
@@ -288,13 +306,15 @@ if ($hasExistingCompose) {
 
 # 9) Prepare remote host
 Write-Info "Prepare remote: create direcotry $remoteTasksDir"
-Invoke-SshScript -User $user -Server $sshhost -Port $port -Script "mkdir -p '$remoteTasksDir'"
+Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script "mkdir -p '$remoteTasksDir'"
+Start-Sleep -Seconds $ConnectDelaySeconds
 
 $prepScriptPath = Join-Path $PSScriptRoot 'ssh_tasks\prepare_remote.sh'
 $remotePrepPath = "$remoteTasksDir/prepare_remote.sh"
 Write-Info "Prepare remote: copy $prepScriptPath to direcotry $remoteTasksDir"
-Copy-RemoteScript -LocalPath $prepScriptPath -RemotePath $remotePrepPath -User $user -Server $sshhost -Port $port
- 
+Copy-RemoteScript -LocalPath $prepScriptPath -RemotePath $remotePrepPath -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds
+Start-Sleep -Seconds $ConnectDelaySeconds
+
 $prepEnvAssignments = @(
   "REMOTE_DIR='$(Escape-SingleQuote $remoteDir)'"
   'SUDO=''sudo -S -p ""'''
@@ -305,8 +325,8 @@ $prepEnvAssignments = @(
 $remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh'"
 Write-Info "Prepare remote: execute ssh command - $remoteCmd"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $remoteCmd
-
 Write-Success 'Remote preparation complete.'
+Start-Sleep -Seconds $ConnectDelaySeconds
 
 # 10) Sync project using selected strategy
 $syncContext = @{
@@ -320,11 +340,13 @@ $syncContext = @{
 }
 Invoke-DeploymentSync -Method $method -Context $syncContext
 Write-Success "Sync via '$method' completed."
+Start-Sleep -Seconds $ConnectDelaySeconds
 
 # 11) Deploy application on remote host
 $deployScriptPath = Join-Path $PSScriptRoot 'ssh_tasks\deploy.sh'
 $remoteDeployPath = "$remoteTasksDir/deploy.sh"
-Copy-RemoteScript -LocalPath $deployScriptPath -RemotePath $remoteDeployPath -User $user -Server $sshhost -Port $port
+Copy-RemoteScript -LocalPath $deployScriptPath -RemotePath $remoteDeployPath -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds
+Start-Sleep -Seconds $ConnectDelaySeconds
 
 $deployEnvAssignments = @(
   "REMOTE_DIR='$(Escape-SingleQuote $remoteDir)'"

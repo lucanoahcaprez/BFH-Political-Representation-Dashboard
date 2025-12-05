@@ -11,13 +11,14 @@ function Test-SshConnection {
   param(
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
-    [int]$Port = 22
+    [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20
   )
 
   $args = @(
     '-p', $Port,
     '-o', 'PreferredAuthentications=publickey,password',
-    '-o', 'ConnectTimeout=10',
+    '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
     "$User@$Server",
     'exit 0'
   )
@@ -32,13 +33,14 @@ function Invoke-SshScript {
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
     [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$Script
   )
 
   $args = @(
     '-p', $Port,
     '-o', 'PreferredAuthentications=publickey,password',
-    '-o', 'ConnectTimeout=10',
+    '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
     '-o', 'StrictHostKeyChecking=accept-new',
     "$User@$Server",
     "set -euo pipefail; $Script"
@@ -56,13 +58,14 @@ function Invoke-SshScriptOutput {
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
     [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$Script
   )
 
   $args = @(
     '-p', $Port,
     '-o', 'PreferredAuthentications=publickey,password',
-    '-o', 'ConnectTimeout=10',
+    '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
     '-o', 'StrictHostKeyChecking=accept-new',
     "$User@$Server",
     "set -euo pipefail; $Script"
