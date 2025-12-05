@@ -25,9 +25,6 @@ $remoteTasksDir = "/tmp/pol-dashboard-tasks"
 $checkScriptName = 'check_remote_compose.sh'
 $shutdownScriptName = 'shutdown_remote_compose.sh'
 $checkSudoScriptName = 'check_sudo.sh'
-$localCheckScript = Join-Path $PSScriptRoot "ssh_tasks\$checkScriptName"
-$localShutdownScript = Join-Path $PSScriptRoot "ssh_tasks\$shutdownScriptName"
-$localCheckSudoScript = Join-Path $PSScriptRoot "ssh_tasks\$checkSudoScriptName"
 
 function ConvertTo-EscapedSingleQuote {
   param([Parameter(Mandatory = $true)][string]$Text)
@@ -178,6 +175,7 @@ function Stop-RemoteCompose {
   if ($SudoPassword) { $envAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $SudoPassword)'" }
   $envPrefix = $envAssignments -join ' '
   $shutdownCmd = "cd '$RemoteTasksDir' && chmod +x '$shutdownScriptName' && $envPrefix bash '$shutdownScriptName'"
+  Write-Host $shutdownCmd
   Invoke-SshScript -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $shutdownCmd
 }
 
@@ -300,10 +298,8 @@ do {
     Write-Warn 'Password cannot be empty. Please enter a value.'
   }
 } until (-not [string]::IsNullOrWhiteSpace($sudoPassword))
-
-Write-Success "SUDO password ok."
 $sudoPassword = Validate-RemoteSudo -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -SudoPassword $sudoPassword
-
+Write-Success "SUDO password ok."
 
 # 7) Prompt for remote directory and optional shutdown
 $remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashboard]' -Default '/opt/political-dashboard'
