@@ -31,22 +31,6 @@ function Escape-SingleQuote {
   return $Text -replace "'", $replacement
 }
 
-function Read-EnvDeployValues {
-  param([Parameter(Mandatory = $true)][string]$Path)
-  $result = @{}
-  if (-not (Test-Path $Path)) { return $result }
-  foreach ($line in Get-Content -Path $Path) {
-    if ($line -match '^\s*$' -or $line -match '^\s*#') { continue }
-    $parts = $line.Split('=', 2, [System.StringSplitOptions]::None)
-    if ($parts.Count -eq 2) {
-      $key = $parts[0].Trim()
-      $val = $parts[1].Trim()
-      if ($key) { $result[$key] = $val }
-    }
-  }
-  return $result
-}
-
 function Get-AppUrl {
   param(
     [hashtable]$EnvValues,
@@ -99,39 +83,6 @@ function Copy-RemoteScript {
   } finally {
     if (Test-Path $temp) { Remove-Item $temp -Force }
   }
-}
-
-function Invoke-SshScriptOutput {
-  param(
-    [Parameter(Mandatory = $true)][string]$User,
-    [Parameter(Mandatory = $true)][string]$Server,
-    [int]$Port = 22,
-    [Parameter(Mandatory = $true)][string]$Script
-  )
-
-  $args = @(
-    '-p', $Port,
-    '-o', 'PreferredAuthentications=publickey,password',
-    '-o', 'ConnectTimeout=10',
-    '-o', 'StrictHostKeyChecking=accept-new',
-    "$User@$Server",
-    "set -euo pipefail; $Script"
-  )
-
-  $output = & ssh @args
-  if ($LASTEXITCODE -ne 0) {
-    Throw-Die "ssh exited with code $LASTEXITCODE"
-  }
-  return $output
-}
-
-function Ensure-LocalSshKey {
-  $keyPath = Join-Path $HOME '.ssh\id_ed25519'
-  if (-not (Test-Path $keyPath)) {
-    Write-Host "Generating SSH key at $keyPath"
-    ssh-keygen -t ed25519 -N '' -f $keyPath | Out-Null
-  }
-  return "$keyPath.pub"
 }
 
 function Install-PublicKeyRemote {

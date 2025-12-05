@@ -49,3 +49,28 @@ function Invoke-SshScript {
     Throw-Die "ssh exited with code $($process.ExitCode)"
   }
 }
+
+# invoke ssh script with output
+function Invoke-SshScriptOutput {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [Parameter(Mandatory = $true)][string]$Script
+  )
+
+  $args = @(
+    '-p', $Port,
+    '-o', 'PreferredAuthentications=publickey,password',
+    '-o', 'ConnectTimeout=10',
+    '-o', 'StrictHostKeyChecking=accept-new',
+    "$User@$Server",
+    "set -euo pipefail; $Script"
+  )
+
+  $output = & ssh @args
+  if ($LASTEXITCODE -ne 0) {
+    Throw-Die "ssh exited with code $LASTEXITCODE"
+  }
+  return $output
+}

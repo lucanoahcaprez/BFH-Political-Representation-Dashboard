@@ -62,6 +62,5 @@ if [ -z "$compose_cmd" ]; then
   exit 1
 fi
 
-# shellcheck disable=SC2206
 compose_parts=($compose_cmd)
 run_cmd "${compose_parts[@]}" -f "$compose_file" down

@@ -19,3 +19,32 @@ function Require-Command {
     Throw-Die "missing required command: $Name"
   }
 }
+
+
+# read env values
+
+function Read-EnvDeployValues {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $result = @{}
+  if (-not (Test-Path $Path)) { return $result }
+  foreach ($line in Get-Content -Path $Path) {
+    if ($line -match '^\s*$' -or $line -match '^\s*#') { continue }
+    $parts = $line.Split('=', 2, [System.StringSplitOptions]::None)
+    if ($parts.Count -eq 2) {
+      $key = $parts[0].Trim()
+      $val = $parts[1].Trim()
+      if ($key) { $result[$key] = $val }
+    }
+  }
+  return $result
+}
+
+# ensure local ssh key
+function Ensure-LocalSshKey {
+  $keyPath = Join-Path $HOME '.ssh\id_ed25519'
+  if (-not (Test-Path $keyPath)) {
+    Write-Host "Generating SSH key at $keyPath"
+    ssh-keygen -t ed25519 -N '' -f $keyPath | Out-Null
+  }
+  return "$keyPath.pub"
+}
