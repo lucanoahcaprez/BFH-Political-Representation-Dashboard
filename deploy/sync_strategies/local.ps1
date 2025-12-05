@@ -31,13 +31,13 @@ function Invoke-SyncStrategy {
   $defaultRoot = Get-DefaultLocalRoot -DeployRoot $Context.DeployRoot
   $localRoot = $null
   do {
-    $input = Read-Value -Message 'Local project root' -Default $defaultRoot
+    $inputValue = Read-Value -Message 'Choose local project root' -Default $defaultRoot
     if (-not (Test-Path $input)) {
-      Write-Warn "Path not found: $input"
+      Write-Warn "Path not found: $inputValue"
       continue
     }
 
-    $resolved = (Resolve-Path $input).ProviderPath
+    $resolved = (Resolve-Path $inputValue).ProviderPath
     $compose = Join-Path $resolved 'docker-compose.yml'
     if (-not (Test-Path $compose)) {
       Write-Warn "docker-compose.yml not found in $resolved"

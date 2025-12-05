@@ -1,3 +1,7 @@
+param(
+  [switch]$UseDefaults = $false
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -5,6 +9,15 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\lib\ui.ps1')
 
 $EnvFile = Join-Path (Get-Location) '.env.deploy'
+
+$DefaultAppDomain   = ''
+$DefaultFrontend    = '8080'
+$DefaultBackend     = '3000'
+$DefaultDbPort      = '5432'
+$DefaultDbUser      = 'postgres'
+$DefaultPostgresDb  = 'political_dashboard'
+$DefaultFrontendImg = 'political-dashboard-frontend'
+$DefaultBackendImg  = 'political-dashboard-backend'
 
 function Mask-Value {
   param([string]$Name, [string]$Value)
@@ -15,12 +28,21 @@ function Mask-Value {
   return $Value
 }
 
-# Collect values
-$APP_DOMAIN = Read-Value -Message 'Domain (empty or localhost for http://localhost)' -Default ''
-$FRONTEND_PORT = Read-Value -Message 'Frontend port' -Default '8080'
-$BACKEND_PORT = Read-Value -Message 'Backend port' -Default '3000'
-$DB_PORT = Read-Value -Message 'Database port' -Default '5432'
-$POSTGRES_USER = Read-Value -Message 'Postgres user' -Default 'postgres'
+if ($UseDefaults) {
+  Write-Info "Using default environment values (domain empty, ports 8080/3000/5432, user postgres)."
+  $APP_DOMAIN     = $DefaultAppDomain
+  $FRONTEND_PORT  = $DefaultFrontend
+  $BACKEND_PORT   = $DefaultBackend
+  $DB_PORT        = $DefaultDbPort
+  $POSTGRES_USER  = $DefaultDbUser
+} else {
+  # Collect values interactively
+  $APP_DOMAIN = Read-Value -Message 'Domain (empty or localhost for http://localhost)' -Default $DefaultAppDomain
+  $FRONTEND_PORT = Read-Value -Message 'Frontend port' -Default $DefaultFrontend
+  $BACKEND_PORT = Read-Value -Message 'Backend port' -Default $DefaultBackend
+  $DB_PORT = Read-Value -Message 'Database port' -Default $DefaultDbPort
+  $POSTGRES_USER = Read-Value -Message 'Postgres user' -Default $DefaultDbUser
+}
 
 do {
   $POSTGRES_PASSWORD = Read-Secret -Message 'Postgres password'
@@ -29,10 +51,10 @@ do {
   }
 } until (-not [string]::IsNullOrWhiteSpace($POSTGRES_PASSWORD))
 
-$POSTGRES_DB = 'political_dashboard'
+$POSTGRES_DB = $DefaultPostgresDb
 $DATABASE_URL = "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
-$FRONTEND_IMAGE = 'political-dashboard-frontend'
-$BACKEND_IMAGE = 'political-dashboard-backend'
+$FRONTEND_IMAGE = $DefaultFrontendImg
+$BACKEND_IMAGE = $DefaultBackendImg
 
 $values = [ordered]@{
   APP_DOMAIN        = $APP_DOMAIN

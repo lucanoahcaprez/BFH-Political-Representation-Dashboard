@@ -117,7 +117,6 @@ chmod 600 ~/.ssh/authorized_keys
 grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/authorized_keys
 "@
 
-  Write-Host "Installing public key to $User@$Server (password auth will be prompted once)..."
   $args = @(
     '-p', $Port,
     '-o', 'PreferredAuthentications=password',
@@ -198,9 +197,9 @@ $remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashbo
 
 # 6) Create/update local .env.deploy
 Write-Info 'Gather input for creation of .env.deploy'
+$useEnvDefaults = Confirm-Action -Message 'Use default environment values (ports 8080/3000/5432, postgres user, empty domain)?'
 $createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
-
-$global:EnvFile = & $createEnv
+$global:EnvFile = & $createEnv -UseDefaults:$useEnvDefaults
 $envDeployPath = Join-Path (Get-Location) '.env.deploy'
 if (-not (Test-Path $envDeployPath)) {
   # Fallback to script root in case the working directory differs.
