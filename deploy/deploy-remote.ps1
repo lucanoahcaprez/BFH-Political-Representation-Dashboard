@@ -310,7 +310,7 @@ $sudoPassword = Read-Secret -Message 'SUDO password'
 
 # 7) Create/update local .env.deploy
 Write-Info 'Gather input for creation of .env.deploy'
-$useEnvDefaults = Confirm-Action -Message 'Use default environment values (ports 8080/3000/5432, postgres user, empty domain)?'
+$useEnvDefaults = Confirm-Action -Message 'Use default environment values (ports 8080/3000/5432, postgres user)?'
 $createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
 $envFile = & $createEnv -UseDefaults:$useEnvDefaults
 $envDeployPath = Join-Path (Get-Location) '.env.deploy'

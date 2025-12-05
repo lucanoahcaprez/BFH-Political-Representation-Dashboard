@@ -28,7 +28,7 @@ function Mask-Value {
 }
 
 if ($UseDefaults) {
-  Write-Info "Using default environment values (domain empty, ports 8080/3000/5432, user postgres)."
+  Write-Info "Using default environment values (ports 8080/3000/5432, user postgres)."
   $FRONTEND_PORT  = $DefaultFrontend
   $BACKEND_PORT   = $DefaultBackend
   $DB_PORT        = $DefaultDbPort
@@ -69,12 +69,6 @@ Write-Info "`nSummary:"
 foreach ($entry in $values.GetEnumerator()) {
   $val = if ($null -eq $entry.Value) { '' } else { $entry.Value }
   Write-Host ("  {0} = {1}" -f $entry.Key, (Mask-Value -Name $entry.Key -Value $val))
-}
-
-$confirm = Confirm-Action -Message "`nWrite to .env.deploy?"
-if (-not $confirm) {
-  Write-Warn 'Aborted. No file written.'
-  exit 0
 }
 
 if (Test-Path $EnvFile) {
