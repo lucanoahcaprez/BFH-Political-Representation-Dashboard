@@ -18,7 +18,7 @@ $DefaultPostgresDb  = 'political_dashboard'
 $DefaultFrontendImg = 'political-dashboard-frontend'
 $DefaultBackendImg  = 'political-dashboard-backend'
 
-function Mask-Value {
+function Protect-Value {
   param([string]$Name, [string]$Value)
   if ($Name -match 'PASSWORD' -or $Name -match 'SECRET' -or $Name -match 'TOKEN') {
     if ($Value.Length -le 4) { return '****' }
@@ -68,7 +68,7 @@ $values = [ordered]@{
 Write-Info "`nSummary:"
 foreach ($entry in $values.GetEnumerator()) {
   $val = if ($null -eq $entry.Value) { '' } else { $entry.Value }
-  Write-Host ("  {0} = {1}" -f $entry.Key, (Mask-Value -Name $entry.Key -Value $val))
+  Write-Host ("  {0} = {1}" -f $entry.Key, (Protect-Value -Name $entry.Key -Value $val))
 }
 
 if (Test-Path $EnvFile) {

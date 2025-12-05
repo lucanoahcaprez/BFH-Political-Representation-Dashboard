@@ -76,8 +76,8 @@ function Invoke-SyncStrategy {
 
       # TODO: Explain why we used robocopy
       New-Item -ItemType Directory -Path $Destination -Force | Out-Null
-      $args = @($Source, $Destination, '/MIR', '/XD', 'node_modules')
-      $proc = Start-Process -FilePath 'robocopy' -ArgumentList $args -NoNewWindow -Wait -PassThru
+      $arguments = @($Source, $Destination, '/MIR', '/XD', 'node_modules')
+      $proc = Start-Process -FilePath 'robocopy' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
       # Robocopy exit codes: 0-7 are success/acceptable, >7 indicate failure.
       if ($proc.ExitCode -gt 7) {
         Throw-Die "robocopy failed ($($proc.ExitCode)) while copying $Source"

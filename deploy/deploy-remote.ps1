@@ -301,7 +301,7 @@ $sudoPassword = Test-RemoteSudo -User $user -Server $sshhost -Port $port -Connec
 Write-Success "SUDO password ok."
 
 # 7) Prompt for remote directory and optional shutdown
-$remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashboard]' -Default '/opt/political-dashboard'
+$remoteDir = Read-Value -Message 'Remote deploy directory' -Default '/opt/political-dashboard'
 
 Write-Info "Prepare remote helper directory $remoteTasksDir"
 
