@@ -10,7 +10,6 @@ $ErrorActionPreference = 'Stop'
 
 $EnvFile = Join-Path (Get-Location) '.env.deploy'
 
-$DefaultAppDomain   = ''
 $DefaultFrontend    = '8080'
 $DefaultBackend     = '3000'
 $DefaultDbPort      = '5432'
@@ -30,14 +29,12 @@ function Mask-Value {
 
 if ($UseDefaults) {
   Write-Info "Using default environment values (domain empty, ports 8080/3000/5432, user postgres)."
-  $APP_DOMAIN     = $DefaultAppDomain
   $FRONTEND_PORT  = $DefaultFrontend
   $BACKEND_PORT   = $DefaultBackend
   $DB_PORT        = $DefaultDbPort
   $POSTGRES_USER  = $DefaultDbUser
 } else {
   # Collect values interactively
-  $APP_DOMAIN = Read-Value -Message 'Domain (empty or localhost for http://localhost)' -Default $DefaultAppDomain
   $FRONTEND_PORT = Read-Value -Message 'Frontend port' -Default $DefaultFrontend
   $BACKEND_PORT = Read-Value -Message 'Backend port' -Default $DefaultBackend
   $DB_PORT = Read-Value -Message 'Database port' -Default $DefaultDbPort
@@ -57,7 +54,6 @@ $FRONTEND_IMAGE = $DefaultFrontendImg
 $BACKEND_IMAGE = $DefaultBackendImg
 
 $values = [ordered]@{
-  APP_DOMAIN        = $APP_DOMAIN
   FRONTEND_PORT     = $FRONTEND_PORT
   BACKEND_PORT      = $BACKEND_PORT
   DB_PORT           = $DB_PORT
@@ -90,7 +86,6 @@ if (Test-Path $EnvFile) {
 }
 
 $content = @"
-APP_DOMAIN=$APP_DOMAIN
 FRONTEND_PORT=$FRONTEND_PORT
 BACKEND_PORT=$BACKEND_PORT
 DB_PORT=$DB_PORT

@@ -32,7 +32,7 @@ function Invoke-SyncStrategy {
   $localRoot = $null
   do {
     $inputValue = Read-Value -Message 'Choose local project root' -Default $defaultRoot
-    if (-not (Test-Path $input)) {
+    if (-not (Test-Path $inputValue)) {
       Write-Warn "Path not found: $inputValue"
       continue
     }

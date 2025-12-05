@@ -211,12 +211,14 @@ $envValues = Read-EnvDeployValues -Path $envDeployPath
 $method = Read-Choice -Message 'Deployment method? [local|git|archive]' -Options @('local', 'git', 'archive')
 Write-Info "Selected method: $method"
 
-# 8) Prepare remote host (idempotent)
+# 8) Prepare remote host
 $remoteTasksDir = "/tmp/pol-dashboard-tasks"
+Write-Info "Prepare remote: create direcotry $remoteTasksDir"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script "mkdir -p '$remoteTasksDir'"
 
 $prepScriptPath = Join-Path $PSScriptRoot 'ssh_tasks\prepare_remote.sh'
 $remotePrepPath = "$remoteTasksDir/prepare_remote.sh"
+Write-Info "Prepare remote: copy $prepScriptPath to direcotry $remoteTasksDir"
 Copy-RemoteScript -LocalPath $prepScriptPath -RemotePath $remotePrepPath -User $user -Server $sshhost -Port $port
  
 $prepEnvAssignments = @(
@@ -227,6 +229,7 @@ $prepEnvAssignments = @(
 
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
 $remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh'"
+Write-Info "Prepare remote: execute ssh command - $remoteCmd"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $remoteCmd
 
 Write-Success 'Remote preparation complete.'
