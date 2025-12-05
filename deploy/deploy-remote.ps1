@@ -1,3 +1,8 @@
+[CmdletBinding()]
+param(
+  [switch]$Shutdown
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -13,6 +18,12 @@ $logFile = Join-Path $logDir ("deploy-remote-{0}.log" -f (Get-Date -Format 'yyyy
 Set-UiLogFile -Path $logFile
 Set-UiInfoVisibility -Visible:$false
 Write-Success "Logging deployment details to $logFile"
+
+$remoteTasksDir = "/tmp/pol-dashboard-tasks"
+$checkScriptName = 'check_remote_compose.sh'
+$shutdownScriptName = 'shutdown_remote_compose.sh'
+$localCheckScript = Join-Path $PSScriptRoot "ssh_tasks\$checkScriptName"
+$localShutdownScript = Join-Path $PSScriptRoot "ssh_tasks\$shutdownScriptName"
 
 function Escape-SingleQuote {
   param([Parameter(Mandatory = $true)][string]$Text)
@@ -90,6 +101,30 @@ function Copy-RemoteScript {
   }
 }
 
+function Invoke-SshScriptOutput {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [Parameter(Mandatory = $true)][string]$Script
+  )
+
+  $args = @(
+    '-p', $Port,
+    '-o', 'PreferredAuthentications=publickey,password',
+    '-o', 'ConnectTimeout=10',
+    '-o', 'StrictHostKeyChecking=accept-new',
+    "$User@$Server",
+    "set -euo pipefail; $Script"
+  )
+
+  $output = & ssh @args
+  if ($LASTEXITCODE -ne 0) {
+    Throw-Die "ssh exited with code $LASTEXITCODE"
+  }
+  return $output
+}
+
 function Ensure-LocalSshKey {
   $keyPath = Join-Path $HOME '.ssh\id_ed25519'
   if (-not (Test-Path $keyPath)) {
@@ -129,6 +164,64 @@ grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/a
   if ($proc.ExitCode -ne 0) {
     Throw-Die "failed to install SSH key (ssh exited with $($proc.ExitCode))"
   }
+}
+
+function Ensure-RemoteTasksDir {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [Parameter(Mandatory = $true)][string]$RemoteTasksDir
+  )
+
+  Invoke-SshScript -User $User -Server $Server -Port $Port -Script "mkdir -p '$RemoteTasksDir'"
+}
+
+function Ensure-ComposeHelperScripts {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [Parameter(Mandatory = $true)][string]$RemoteTasksDir
+  )
+
+  $remoteCheckPath = "$RemoteTasksDir/$checkScriptName"
+  $remoteShutdownPath = "$RemoteTasksDir/$shutdownScriptName"
+  Copy-RemoteScript -LocalPath $localCheckScript -RemotePath $remoteCheckPath -User $User -Server $Server -Port $Port
+  Copy-RemoteScript -LocalPath $localShutdownScript -RemotePath $remoteShutdownPath -User $User -Server $Server -Port $Port
+}
+
+function Test-RemoteComposePresent {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
+    [Parameter(Mandatory = $true)][string]$RemoteDir
+  )
+
+  $checkCmd = "cd '$RemoteTasksDir' && chmod +x '$checkScriptName' && REMOTE_DIR='$(Escape-SingleQuote $RemoteDir)' bash '$checkScriptName'"
+  $output = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -Script $checkCmd
+  return ($output -match 'present')
+}
+
+function Stop-RemoteCompose {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
+    [Parameter(Mandatory = $true)][string]$RemoteDir,
+    [string]$SudoCmd = $null,
+    [string]$SudoPassword = $null
+  )
+
+  $envAssignments = @("REMOTE_DIR='$(Escape-SingleQuote $RemoteDir)'")
+  if ($SudoCmd) { $envAssignments += "SUDO_CMD='$(Escape-SingleQuote $SudoCmd)'" }
+  if ($SudoPassword) { $envAssignments += "SUDO_PASSWORD='$(Escape-SingleQuote $SudoPassword)'" }
+  $envPrefix = $envAssignments -join ' '
+  $shutdownCmd = "cd '$RemoteTasksDir' && chmod +x '$shutdownScriptName' && $envPrefix bash '$shutdownScriptName'"
+  Invoke-SshScript -User $User -Server $Server -Port $Port -Script $shutdownCmd
 }
 
 function Invoke-DeploymentSync {
@@ -184,7 +277,28 @@ if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port)) {
 }
 Write-Success 'SSH connection with key OK.'
 
-# 5) Prompt for further informations
+# 5) Prompt for remote directory and optional shutdown
+$remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashboard]' -Default '/opt/political-dashboard'
+
+Write-Info "Prepare remote helper directory $remoteTasksDir"
+Ensure-RemoteTasksDir -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir
+Ensure-ComposeHelperScripts -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir
+
+if ($Shutdown) {
+  Write-Info "Checking for existing docker-compose files in $remoteDir"
+  $hasCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+  if ($hasCompose) {
+    Write-Info "Stopping existing docker-compose stack in $remoteDir"
+    Stop-RemoteCompose -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+    Write-Success "Remote docker-compose stack stopped."
+  } else {
+    Write-Info "No docker-compose files found in $remoteDir"
+  }
+  Write-Success 'Shutdown flag completed. Exiting.'
+  exit 0
+}
+
+# 6) Prompt for further informations
 Write-Info 'Prompting for further informations'
 do {
 $sudoPassword = Read-Secret -Message 'SUDO password'
@@ -192,14 +306,13 @@ $sudoPassword = Read-Secret -Message 'SUDO password'
     Write-Warn 'Password cannot be empty. Please enter a value.'
   }
 } until (-not [string]::IsNullOrWhiteSpace($sudoPassword))
-$remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashboard]' -Default '/opt/political-dashboard'
 
 
-# 6) Create/update local .env.deploy
+# 7) Create/update local .env.deploy
 Write-Info 'Gather input for creation of .env.deploy'
 $useEnvDefaults = Confirm-Action -Message 'Use default environment values (ports 8080/3000/5432, postgres user, empty domain)?'
 $createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
-$global:EnvFile = & $createEnv -UseDefaults:$useEnvDefaults
+$envFile = & $createEnv -UseDefaults:$useEnvDefaults
 $envDeployPath = Join-Path (Get-Location) '.env.deploy'
 if (-not (Test-Path $envDeployPath)) {
   # Fallback to script root in case the working directory differs.
@@ -207,12 +320,20 @@ if (-not (Test-Path $envDeployPath)) {
 }
 $envValues = Read-EnvDeployValues -Path $envDeployPath
 
-# 7) Ask deployment method (placeholder)
+# 8) Ask deployment method (placeholder)
 $method = Read-Choice -Message 'Deployment method? [local|git|archive]' -Options @('local', 'git', 'archive')
 Write-Info "Selected method: $method"
 
-# 8) Prepare remote host
-$remoteTasksDir = "/tmp/pol-dashboard-tasks"
+$hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+if ($hasExistingCompose) {
+  $action = Read-Choice -Message "Existing docker-compose found in $remoteDir. [redeploy|cancel]" -Options @('redeploy', 'cancel')
+  if ($action -eq 'cancel') {
+    Write-Warn 'Deployment cancelled by user.'
+    exit 0
+  }
+}
+
+# 9) Prepare remote host
 Write-Info "Prepare remote: create direcotry $remoteTasksDir"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script "mkdir -p '$remoteTasksDir'"
 
@@ -234,7 +355,7 @@ Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $remoteCmd
 
 Write-Success 'Remote preparation complete.'
 
-# 9) Sync project using selected strategy
+# 10) Sync project using selected strategy
 $syncContext = @{
   Method     = $method
   User       = $user
@@ -242,11 +363,12 @@ $syncContext = @{
   Port       = $port
   RemoteDir  = $remoteDir
   DeployRoot = $PSScriptRoot
+  EnvFile    = $envFile
 }
 Invoke-DeploymentSync -Method $method -Context $syncContext
 Write-Success "Sync via '$method' completed."
 
-# 10) Deploy application on remote host
+# 11) Deploy application on remote host
 $deployScriptPath = Join-Path $PSScriptRoot 'ssh_tasks\deploy.sh'
 $remoteDeployPath = "$remoteTasksDir/deploy.sh"
 Copy-RemoteScript -LocalPath $deployScriptPath -RemotePath $remoteDeployPath -User $user -Server $sshhost -Port $port
@@ -261,7 +383,7 @@ $deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignme
 Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $deployCmd
 Write-Success 'Remote deploy executed.'
 
-# 11) Surface useful info to the user
+# 12) Surface useful info to the user
 $remoteLogDir = '/var/log/political-dashboard'
 $appUrl = Get-AppUrl -EnvValues $envValues -Server $sshhost
 

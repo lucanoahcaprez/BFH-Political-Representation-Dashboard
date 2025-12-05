@@ -25,6 +25,7 @@ function Invoke-SyncStrategy {
     [Parameter(Mandatory = $true)][hashtable]$Context
   )
 
+  Require-Command 'ssh'
   Require-Command 'scp'
   Require-Command 'robocopy'
 
@@ -55,8 +56,8 @@ function Invoke-SyncStrategy {
     }
   }
   # also check for global defined env file
-  if(-not (Test-Path $global:EnvFile)){
-      Throw-Die "Required item missing (.env.deploy) at $global:EnvFile)"
+  if (-not (Test-Path $Context.EnvFile)) {
+    Throw-Die "Required item missing (.env.deploy) at $Context.EnvFile)"
   }
 
   $remoteDir = $Context.RemoteDir
@@ -87,7 +88,7 @@ function Invoke-SyncStrategy {
     Copy-WithExcludeNodeModules -Source (Join-Path $localRoot 'frontend') -Destination (Join-Path $staging 'frontend')
     Copy-Item -Path (Join-Path $localRoot 'docker-compose.yml') -Destination $staging -Force
     Copy-Item -Path (Join-Path $localRoot 'docker-compose.prod.yml') -Destination $staging -Force
-    Copy-Item -Path $global:EnvFile -Destination $staging -Force
+    Copy-Item -Path $Context.EnvFile -Destination $staging -Force
 
     $destination = "$sshTarget`:$remoteDir/"
     $scpArgs = @(
