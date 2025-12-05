@@ -46,8 +46,16 @@ function Write-LogLine {
   if ($shouldWrite) {
     if ($null -ne $Color) {
       Write-Host $line -ForegroundColor $Color
+      # Flush input buffer (Enter key leftover) - credits: GPT 5.1
+      while ([Console]::KeyAvailable) {
+          [Console]::ReadKey($true) | Out-Null
+      }
     } else {
       Write-Host $line
+      # Flush input buffer (Enter key leftover) - credits: GPT 5.1
+      while ([Console]::KeyAvailable) {
+          [Console]::ReadKey($true) | Out-Null
+      }
     }
   }
 }
@@ -158,5 +166,9 @@ function Read-Secret {
     Write-Host -NoNewline '*'
   }
   Write-Host
+  # Flush input buffer (Enter key leftover) - credits: GPT 5.1
+  while ([Console]::KeyAvailable) {
+      [Console]::ReadKey($true) | Out-Null
+  }
   return $builder.ToString()
 }
