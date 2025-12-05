@@ -15,7 +15,7 @@ function Test-SshConnection {
     [int]$ConnectTimeoutSeconds = 20
   )
 
-  $args = @(
+  $arguments = @(
     '-p', $Port,
     '-o', 'PreferredAuthentications=publickey,password',
     '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
@@ -23,7 +23,7 @@ function Test-SshConnection {
     'exit 0'
   )
 
-  $process = Start-Process -FilePath 'ssh' -ArgumentList $args -NoNewWindow -Wait -PassThru
+  $process = Start-Process -FilePath 'ssh' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
   return ($process.ExitCode -eq 0)
 }
 
@@ -37,7 +37,7 @@ function Invoke-SshScript {
     [Parameter(Mandatory = $true)][string]$Script
   )
 
-  $args = @(
+  $arguments = @(
     '-p', $Port,
     '-o', 'PreferredAuthentications=publickey,password',
     '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
@@ -46,7 +46,7 @@ function Invoke-SshScript {
     "set -euo pipefail; $Script"
   )
 
-  $process = Start-Process -FilePath 'ssh' -ArgumentList $args -NoNewWindow -Wait -PassThru
+  $process = Start-Process -FilePath 'ssh' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
   if ($process.ExitCode -ne 0) {
     Throw-Die "ssh exited with code $($process.ExitCode)"
   }
@@ -62,7 +62,7 @@ function Invoke-SshScriptOutput {
     [Parameter(Mandatory = $true)][string]$Script
   )
 
-  $args = @(
+  $arguments = @(
     '-p', $Port,
     '-o', 'PreferredAuthentications=publickey,password',
     '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
@@ -70,8 +70,8 @@ function Invoke-SshScriptOutput {
     "$User@$Server",
     "set -euo pipefail; $Script"
   )
-
-  $output = & ssh @args
+  $output = & ssh @arguments
+  
   if ($LASTEXITCODE -ne 0) {
     Throw-Die "ssh exited with code $LASTEXITCODE"
   }

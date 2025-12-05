@@ -242,7 +242,16 @@ if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port -ConnectTi
 Start-Sleep -Seconds $ConnectDelaySeconds
 Write-Success 'SSH connection with key OK.'
 
-# 5) Prompt for remote directory and optional shutdown
+# 5) Prompt for further informations
+Write-Info 'Prompting for further informations'
+do {
+$sudoPassword = Read-Secret -Message 'SUDO password'
+  if ([string]::IsNullOrWhiteSpace($sudoPassword)) {
+    Write-Warn 'Password cannot be empty. Please enter a value.'
+  }
+} until (-not [string]::IsNullOrWhiteSpace($sudoPassword))
+
+# 6) Prompt for remote directory and optional shutdown
 $remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashboard]' -Default '/opt/political-dashboard'
 
 Write-Info "Prepare remote helper directory $remoteTasksDir"
@@ -268,15 +277,6 @@ if ($Shutdown) {
   exit 0
 }
 
-# 6) Prompt for further informations
-Write-Info 'Prompting for further informations'
-do {
-$sudoPassword = Read-Secret -Message 'SUDO password'
-  if ([string]::IsNullOrWhiteSpace($sudoPassword)) {
-    Write-Warn 'Password cannot be empty. Please enter a value.'
-  }
-} until (-not [string]::IsNullOrWhiteSpace($sudoPassword))
-
 
 # 7) Create/update local .env.deploy
 Write-Info 'Gather input for creation of .env.deploy'
@@ -294,8 +294,9 @@ $envValues = Read-EnvDeployValues -Path $envDeployPath
 $method = Read-Choice -Message 'Deployment method? [local|git]' -Options @('local', 'git', 'archive')
 Write-Info "Selected method: $method"
 
-$hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
 Start-Sleep -Seconds $ConnectDelaySeconds
+$hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+
 if ($hasExistingCompose) {
   $action = Read-Choice -Message "Existing docker-compose found in $remoteDir. [redeploy|cancel]" -Options @('redeploy', 'cancel')
   if ($action -eq 'cancel') {
