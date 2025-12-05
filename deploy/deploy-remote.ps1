@@ -24,8 +24,10 @@ Write-Success "Logging deployment details to $logFile"
 $remoteTasksDir = "/tmp/pol-dashboard-tasks"
 $checkScriptName = 'check_remote_compose.sh'
 $shutdownScriptName = 'shutdown_remote_compose.sh'
+$checkSudoScriptName = 'check_sudo.sh'
 $localCheckScript = Join-Path $PSScriptRoot "ssh_tasks\$checkScriptName"
 $localShutdownScript = Join-Path $PSScriptRoot "ssh_tasks\$shutdownScriptName"
+$localCheckSudoScript = Join-Path $PSScriptRoot "ssh_tasks\$checkSudoScriptName"
 
 function Escape-SingleQuote {
   param([Parameter(Mandatory = $true)][string]$Text)
@@ -152,6 +154,19 @@ function Ensure-ComposeHelperScripts {
   Copy-RemoteScript -LocalPath $localShutdownScript -RemotePath $remoteShutdownPath -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds
 }
 
+function Ensure-SudoCheckScript {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
+    [Parameter(Mandatory = $true)][string]$RemoteTasksDir
+  )
+
+  $remoteCheckSudoPath = "$RemoteTasksDir/$checkSudoScriptName"
+  Copy-RemoteScript -LocalPath $localCheckSudoScript -RemotePath $remoteCheckSudoPath -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds
+}
+
 function Test-RemoteComposePresent {
   param(
     [Parameter(Mandatory = $true)][string]$User,
@@ -185,6 +200,49 @@ function Stop-RemoteCompose {
   $envPrefix = $envAssignments -join ' '
   $shutdownCmd = "cd '$RemoteTasksDir' && chmod +x '$shutdownScriptName' && $envPrefix bash '$shutdownScriptName'"
   Invoke-SshScript -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $shutdownCmd
+}
+
+function Validate-RemoteSudo {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
+    [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
+    [Parameter(Mandatory = $true)][string]$SudoPassword
+  )
+
+  $envAssignments = @(
+    "SUDO_PASSWORD='$(Escape-SingleQuote $SudoPassword)'"
+  ) -join ' '
+
+  $cmd = "cd '$RemoteTasksDir' && chmod +x '$checkSudoScriptName' && $envAssignments bash '$checkSudoScriptName'"
+  Write-Host "$cmd"
+  $result = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $cmd
+  Write-host $result
+  if ($result -match '^ok:') {
+    return
+  }
+
+  if ($result -match 'not_in_sudoers') {
+    Write-Error 'User is not in sudoers. Aborting.'
+    exit 1
+  }
+  if ($result -match 'bad_password') {
+    Write-Error 'Incorrect sudo password. Aborting.'
+    exit 1
+  }
+  if ($result -match 'missing_sudo') {
+    Write-Error 'sudo is not available on the remote host. Aborting.'
+    exit 1
+  }
+  if ($result -match 'missing_password') {
+    Write-Error 'Sudo password missing. Aborting.'
+    exit 1
+  }
+
+  Write-Error "Failed to validate sudo access (remote reported: $result). Aborting."
+  exit 1
 }
 
 function Invoke-DeploymentSync {
@@ -250,6 +308,12 @@ $sudoPassword = Read-Secret -Message 'SUDO password'
     Write-Warn 'Password cannot be empty. Please enter a value.'
   }
 } until (-not [string]::IsNullOrWhiteSpace($sudoPassword))
+
+Start-Sleep -Seconds $ConnectDelaySeconds
+Ensure-SudoCheckScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir
+Start-Sleep -Seconds $ConnectDelaySeconds
+Validate-RemoteSudo -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -SudoPassword $sudoPassword
+
 
 # 6) Prompt for remote directory and optional shutdown
 $remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashboard]' -Default '/opt/political-dashboard'
@@ -325,7 +389,7 @@ $prepEnvAssignments = @(
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
 $remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh'"
 Write-Info "Prepare remote: execute ssh command - $remoteCmd"
-Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $remoteCmd
+Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $remoteCmd
 Write-Success 'Remote preparation complete.'
 Start-Sleep -Seconds $ConnectDelaySeconds
 
@@ -356,7 +420,7 @@ $deployEnvAssignments = @(
 ) -join ' '
 
 $deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"
-Invoke-SshScript -User $user -Server $sshhost -Port $port -Script $deployCmd
+Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $deployCmd
 Write-Success 'Remote deploy executed.'
 
 # 12) Surface useful info to the user
