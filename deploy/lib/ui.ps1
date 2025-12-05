@@ -1,8 +1,13 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$script:UiLogFile = $null
-$script:ShowInfoOnConsole = $true
+# Preserve existing logger settings if the module is dot-sourced multiple times.
+if (-not (Get-Variable -Name UiLogFile -Scope Script -ErrorAction SilentlyContinue)) {
+  $script:UiLogFile = $null
+}
+if (-not (Get-Variable -Name ShowInfoOnConsole -Scope Script -ErrorAction SilentlyContinue)) {
+  $script:ShowInfoOnConsole = $true
+}
 
 function Set-UiLogFile {
   param([Parameter(Mandatory = $true)][string]$Path)
