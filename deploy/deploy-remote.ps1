@@ -29,7 +29,7 @@ $localCheckScript = Join-Path $PSScriptRoot "ssh_tasks\$checkScriptName"
 $localShutdownScript = Join-Path $PSScriptRoot "ssh_tasks\$shutdownScriptName"
 $localCheckSudoScript = Join-Path $PSScriptRoot "ssh_tasks\$checkSudoScriptName"
 
-function Escape-SingleQuote {
+function ConvertTo-EscapedSingleQuote {
   param([Parameter(Mandatory = $true)][string]$Text)
   $replacement = '''"''"'''   # literal 5 chars: ' " ' " '
   return $Text -replace "'", $replacement
@@ -75,14 +75,14 @@ function Copy-RemoteScript {
     $content = Get-RemoteScript -Path $LocalPath
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($temp, $content, $utf8NoBom)
-    $args = @(
+    $arguments = @(
       '-P', $Port,
       '-o', 'StrictHostKeyChecking=accept-new',
       '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
       $temp,
       "$User@$Server`:$RemotePath"
     )
-    $proc = Start-Process -FilePath 'scp' -ArgumentList $args -NoNewWindow -Wait -PassThru
+    $proc = Start-Process -FilePath 'scp' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
     if ($proc.ExitCode -ne 0) {
       Throw-Die "scp exited with code $($proc.ExitCode)"
     }
@@ -110,7 +110,7 @@ chmod 600 ~/.ssh/authorized_keys
 grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/authorized_keys
 "@
 
-  $args = @(
+  $arguments = @(
     '-p', $Port,
     '-o', 'PreferredAuthentications=password',
     '-o', 'PubkeyAuthentication=no',
@@ -119,7 +119,7 @@ grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/a
     "$User@$Server",
     $remoteCmd
   )
-  $proc = Start-Process -FilePath 'ssh' -ArgumentList $args -NoNewWindow -Wait -PassThru
+  $proc = Start-Process -FilePath 'ssh' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
   if ($proc.ExitCode -ne 0) {
     $message = "failed to install SSH key (ssh exited with $($proc.ExitCode))"
     Write-Error $message
@@ -127,7 +127,7 @@ grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/a
   }
 }
 
-function Ensure-RemoteTasksDir {
+function Initialize-RemoteTasksDir {
   param(
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][string]$Server,
@@ -177,7 +177,7 @@ function Test-RemoteComposePresent {
     [Parameter(Mandatory = $true)][string]$RemoteDir
   )
 
-  $checkCmd = "cd '$RemoteTasksDir' && chmod +x '$checkScriptName' && REMOTE_DIR='$(Escape-SingleQuote $RemoteDir)' bash '$checkScriptName'"
+  $checkCmd = "cd '$RemoteTasksDir' && chmod +x '$checkScriptName' && REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $RemoteDir)' bash '$checkScriptName'"
   $output = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $checkCmd
   return ($output -match 'present')
 }
@@ -194,9 +194,9 @@ function Stop-RemoteCompose {
     [string]$SudoPassword = $null
   )
 
-  $envAssignments = @("REMOTE_DIR='$(Escape-SingleQuote $RemoteDir)'")
-  if ($SudoCmd) { $envAssignments += "SUDO_CMD='$(Escape-SingleQuote $SudoCmd)'" }
-  if ($SudoPassword) { $envAssignments += "SUDO_PASSWORD='$(Escape-SingleQuote $SudoPassword)'" }
+  $envAssignments = @("REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $RemoteDir)'")
+  if ($SudoCmd) { $envAssignments += "SUDO_CMD='$(ConvertTo-EscapedSingleQuote $SudoCmd)'" }
+  if ($SudoPassword) { $envAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $SudoPassword)'" }
   $envPrefix = $envAssignments -join ' '
   $shutdownCmd = "cd '$RemoteTasksDir' && chmod +x '$shutdownScriptName' && $envPrefix bash '$shutdownScriptName'"
   Invoke-SshScript -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $shutdownCmd
@@ -209,40 +209,46 @@ function Validate-RemoteSudo {
     [int]$Port = 22,
     [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
-    [Parameter(Mandatory = $true)][string]$SudoPassword
+    [Parameter(Mandatory = $true)][string]$SudoPassword,
+    [int]$MaxAttempts = 3
   )
 
-  $envAssignments = @(
-    "SUDO_PASSWORD='$(Escape-SingleQuote $SudoPassword)'"
-  ) -join ' '
+  $password = $SudoPassword
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    $envAssignments = @("SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $password)'") -join ' '
+    $cmd = "cd '$RemoteTasksDir' && chmod +x '$checkSudoScriptName' && $envAssignments bash '$checkSudoScriptName'"
+    $result = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $cmd
 
-  $cmd = "cd '$RemoteTasksDir' && chmod +x '$checkSudoScriptName' && $envAssignments bash '$checkSudoScriptName'"
-  Write-Host "$cmd"
-  $result = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $cmd
-  Write-host $result
-  if ($result -match '^ok:') {
-    return
-  }
+    if ($result -match '^ok:') {
+      return $password
+    }
 
-  if ($result -match 'not_in_sudoers') {
-    Write-Error 'User is not in sudoers. Aborting.'
-    exit 1
-  }
-  if ($result -match 'bad_password') {
-    Write-Error 'Incorrect sudo password. Aborting.'
-    exit 1
-  }
-  if ($result -match 'missing_sudo') {
-    Write-Error 'sudo is not available on the remote host. Aborting.'
-    exit 1
-  }
-  if ($result -match 'missing_password') {
-    Write-Error 'Sudo password missing. Aborting.'
-    exit 1
-  }
+    if ($result -match 'not_in_sudoers') {
+      Write-Error 'User is not in sudoers. Aborting.'
+      exit 1
+    }
+    if ($result -match 'missing_sudo') {
+      Write-Error 'sudo is not available on the remote host. Aborting.'
+      exit 1
+    }
 
-  Write-Error "Failed to validate sudo access (remote reported: $result). Aborting."
-  exit 1
+    if ($result -match 'bad_password') {
+      if ($attempt -lt $MaxAttempts) {
+        Write-Warn 'Incorrect sudo password. Please try again.'
+        $password = Read-Secret -Message 'SUDO password'
+        continue
+      }
+      Write-Error 'Incorrect sudo password. Aborting.'
+      exit 1
+    }
+    if ($result -match 'missing_password') {
+      Write-Error 'Sudo password missing. Aborting.'
+      exit 1
+    }
+
+    Write-Error "Failed to validate sudo access (remote reported: $result). Aborting."
+    exit 1
+  }
 }
 
 function Invoke-DeploymentSync {
@@ -312,7 +318,7 @@ $sudoPassword = Read-Secret -Message 'SUDO password'
 Start-Sleep -Seconds $ConnectDelaySeconds
 Ensure-SudoCheckScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir
 Start-Sleep -Seconds $ConnectDelaySeconds
-Validate-RemoteSudo -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -SudoPassword $sudoPassword
+$sudoPassword = Validate-RemoteSudo -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -SudoPassword $sudoPassword
 
 
 # 6) Prompt for remote directory and optional shutdown
@@ -320,7 +326,7 @@ $remoteDir = Read-Value -Message 'Remote deploy directory [/opt/political-dashbo
 
 Write-Info "Prepare remote helper directory $remoteTasksDir"
 
-Ensure-RemoteTasksDir -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir
+Initialize-RemoteTasksDir -User $user -Server $sshhost -Port $port -RemoteTasksDir $remoteTasksDir
 Start-Sleep -Seconds $ConnectDelaySeconds
 Ensure-ComposeHelperScripts -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir
 Start-Sleep -Seconds $ConnectDelaySeconds
@@ -381,9 +387,9 @@ Copy-RemoteScript -LocalPath $prepScriptPath -RemotePath $remotePrepPath -User $
 Start-Sleep -Seconds $ConnectDelaySeconds
 
 $prepEnvAssignments = @(
-  "REMOTE_DIR='$(Escape-SingleQuote $remoteDir)'"
+  "REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'"
   'SUDO=''sudo -S -p ""'''
-  "SUDO_PASSWORD='$(Escape-SingleQuote $sudoPassword)'"
+  "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPassword)'"
 ) -join ' '
 
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
@@ -414,9 +420,9 @@ Copy-RemoteScript -LocalPath $deployScriptPath -RemotePath $remoteDeployPath -Us
 Start-Sleep -Seconds $ConnectDelaySeconds
 
 $deployEnvAssignments = @(
-  "REMOTE_DIR='$(Escape-SingleQuote $remoteDir)'"
+  "REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'"
   'SUDO=''sudo -S -p ""'''
-  "SUDO_PASSWORD='$(Escape-SingleQuote $sudoPassword)'"
+  "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPassword)'"
 ) -join ' '
 
 $deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"
