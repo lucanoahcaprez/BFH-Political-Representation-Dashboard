@@ -68,4 +68,4 @@ if [ -z "$compose_cmd" ]; then
 fi
 
 compose_parts=($compose_cmd)
-run_cmd "${compose_parts[@]}" -f "$compose_file" down
+run_cmd "${compose_parts[@]}" -f "$compose_file" down -v

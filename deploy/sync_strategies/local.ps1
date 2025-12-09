@@ -25,9 +25,9 @@ function Invoke-SyncStrategy {
     [Parameter(Mandatory = $true)][hashtable]$Context
   )
 
-  Require-Command 'ssh'
-  Require-Command 'scp'
-  Require-Command 'robocopy'
+  Test-Command 'ssh'
+  Test-Command 'scp'
+  Test-Command 'robocopy'
 
   $defaultRoot = Get-DefaultLocalRoot -DeployRoot $Context.DeployRoot
   $localRoot = $null
@@ -52,12 +52,12 @@ function Invoke-SyncStrategy {
   foreach ($item in $requiredItems) {
     $path = Join-Path $localRoot $item
     if (-not (Test-Path $path)) {
-      Throw-Die "Required item missing ($item) at $path"
+      New-Error "Required item missing ($item) at $path"
     }
   }
   # also check for global defined env file
   if (-not (Test-Path $Context.EnvFile)) {
-    Throw-Die "Required item missing (.env.deploy) at $Context.EnvFile)"
+    New-Error "Required item missing (.env.deploy) at $Context.EnvFile)"
   }
 
   $remoteDir = $Context.RemoteDir
@@ -80,7 +80,7 @@ function Invoke-SyncStrategy {
       $proc = Start-Process -FilePath 'robocopy' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
       # Robocopy exit codes: 0-7 are success/acceptable, >7 indicate failure.
       if ($proc.ExitCode -gt 7) {
-        Throw-Die "robocopy failed ($($proc.ExitCode)) while copying $Source"
+        New-Error "robocopy failed ($($proc.ExitCode)) while copying $Source"
       }
     }
 
@@ -105,7 +105,7 @@ function Invoke-SyncStrategy {
 
     $proc = Start-Process -FilePath 'scp' -ArgumentList $scpArgs -NoNewWindow -Wait -PassThru
     if ($proc.ExitCode -ne 0) {
-      Throw-Die "scp exited with code $($proc.ExitCode)"
+      New-Error "scp exited with code $($proc.ExitCode)"
     }
 
     Write-Success "Copied project assets (excluding node_modules) to $destination"

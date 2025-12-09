@@ -2,7 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Throw with a consistent error message format.
-function Throw-Die {
+function New-Error {
   param(
     [string]$Message = "unknown error"
   )
@@ -10,13 +10,13 @@ function Throw-Die {
 }
 
 # Ensure a command is present on PATH.
-function Require-Command {
+function Test-Command {
   param(
     [Parameter(Mandatory = $true)][string]$Name
   )
 
   if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
-    Throw-Die "missing required command: $Name"
+    New-Error "missing required command: $Name"
   }
 }
 
@@ -40,7 +40,7 @@ function Read-EnvDeployValues {
 }
 
 # ensure local ssh key
-function Ensure-LocalSshKey {
+function Test-LocalSshKey {
   $keyPath = Join-Path $HOME '.ssh\id_ed25519'
   if (-not (Test-Path $keyPath)) {
     Write-Host "Generating SSH key at $keyPath"

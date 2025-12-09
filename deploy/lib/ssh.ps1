@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/util.ps1"
 
 # Ensure ssh is present before use.
-Require-Command 'ssh'
+Test-Command 'ssh'
 
 # Check if SSH connectivity works. Returns $true/$false.
 function Test-SshConnection {
@@ -48,7 +48,7 @@ function Invoke-SshScript {
 
   $process = Start-Process -FilePath 'ssh' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
   if ($process.ExitCode -ne 0) {
-    Throw-Die "ssh exited with code $($process.ExitCode)"
+    New-Error "ssh exited with code $($process.ExitCode)"
   }
 }
 
@@ -73,7 +73,7 @@ function Invoke-SshScriptOutput {
   $output = & ssh @arguments
   
   if ($LASTEXITCODE -ne 0) {
-    Throw-Die "ssh exited with code $LASTEXITCODE"
+    New-Error "ssh exited with code $LASTEXITCODE"
   }
   return $output
 }

@@ -32,6 +32,17 @@ function ConvertTo-EscapedSingleQuote {
   return $Text -replace "'", $replacement
 }
 
+function ConvertFrom-SecureStringPlainText {
+  param([System.Security.SecureString]$SecureText)
+  if (-not $SecureText) { return $null }
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureText)
+  try {
+    return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+  } finally {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+  }
+}
+
 function Get-AppUrl {
   param(
     [hashtable]$EnvValues,
@@ -81,7 +92,7 @@ function Copy-RemoteScript {
     )
     $proc = Start-Process -FilePath 'scp' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
     if ($proc.ExitCode -ne 0) {
-      Throw-Die "scp exited with code $($proc.ExitCode)"
+      New-Error "scp exited with code $($proc.ExitCode)"
     }
   } finally {
     if (Test-Path $temp) { Remove-Item $temp -Force }
@@ -120,7 +131,7 @@ grep -qxF '$escapedPub' ~/.ssh/authorized_keys || echo '$escapedPub' >> ~/.ssh/a
   if ($proc.ExitCode -ne 0) {
     $message = "failed to install SSH key (ssh exited with $($proc.ExitCode))"
     Write-Error $message
-    Throw-Die $message
+    New-Error $message
   }
 }
 
@@ -167,12 +178,15 @@ function Stop-RemoteCompose {
     [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
     [Parameter(Mandatory = $true)][string]$RemoteDir,
     [string]$SudoCmd = $null,
-    [string]$SudoPassword = $null
+    [System.Security.SecureString]$SudoPassword = $null
   )
 
   $envAssignments = @("REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $RemoteDir)'")
   if ($SudoCmd) { $envAssignments += "SUDO_CMD='$(ConvertTo-EscapedSingleQuote $SudoCmd)'" }
-  if ($SudoPassword) { $envAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $SudoPassword)'" }
+  if ($SudoPassword) {
+    $plainSudo = ConvertFrom-SecureStringPlainText -SecureText $SudoPassword
+    $envAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $plainSudo)'"
+  }
   $envPrefix = $envAssignments -join ' '
   $shutdownCmd = "cd '$RemoteTasksDir' && chmod +x '$shutdownScriptName' && $envPrefix bash '$shutdownScriptName'"
   Invoke-SshScript -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $shutdownCmd
@@ -185,18 +199,18 @@ function Test-RemoteSudo {
     [int]$Port = 22,
     [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
-    [Parameter(Mandatory = $true)][string]$SudoPassword,
+    [Parameter(Mandatory = $true)][System.Security.SecureString]$SudoPassword,
     [int]$MaxAttempts = 3
   )
 
-  $password = $SudoPassword
+  $password = ConvertFrom-SecureStringPlainText -SecureText $SudoPassword
   for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
     $envAssignments = @("SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $password)'") -join ' '
     $cmd = "cd '$RemoteTasksDir' && chmod +x '$checkSudoScriptName' && $envAssignments bash '$checkSudoScriptName'"
     $result = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $cmd
 
     if ($result -match '^ok:') {
-      return $password
+      return ConvertTo-SecureString $password -AsPlainText -Force
     }
 
     if ($result -match 'not_in_sudoers') {
@@ -235,7 +249,7 @@ function Invoke-DeploymentSync {
 
   $strategyPath = Join-Path $PSScriptRoot "sync_strategies\$Method.ps1"
   if (-not (Test-Path $strategyPath)) {
-    Throw-Die "Unsupported deployment method '$Method' (missing $strategyPath)"
+    New-Error "Unsupported deployment method '$Method' (missing $strategyPath)"
   }
 
   # Remove any previously loaded strategy entrypoint to avoid stale definitions.
@@ -247,7 +261,7 @@ function Invoke-DeploymentSync {
 
   $strategyFn = Get-Command -Name 'Invoke-SyncStrategy' -CommandType Function -ErrorAction SilentlyContinue
   if (-not $strategyFn) {
-    Throw-Die "Sync strategy '$Method' missing entrypoint Invoke-SyncStrategy"
+    New-Error "Sync strategy '$Method' missing entrypoint Invoke-SyncStrategy"
   }
 
   Invoke-SyncStrategy -Context $Context
@@ -255,9 +269,9 @@ function Invoke-DeploymentSync {
 
 # 1) Check dependencies
 Write-Info "Checking dependency on $ENV:COMPUTERNAME"
-Require-Command 'ssh'
-Require-Command 'scp'
-Require-Command 'ssh-keygen'
+Test-Command 'ssh'
+Test-Command 'scp'
+Test-Command 'ssh-keygen'
 
 # 2) Ask for SSH connection details
 Write-Info "Read connection details for ssh"
@@ -268,7 +282,7 @@ $user = Read-Value -Message 'SSH user'
 
 # 3) Ensure keypair locally and install pubkey remotely (one-time password)
 Write-Info "Ensure local sshkey is present"
-$pubKeyPath = Ensure-LocalSshKey
+$pubKeyPath = Test-LocalSshKey
 Write-Info "Try to install public-key on $sshhost"
 Install-PublicKeyRemote -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -PublicKeyPath $pubKeyPath
 
@@ -292,11 +306,12 @@ Initialize-RemoteTaskScripts -User $user -Server $sshhost -Port $port -ConnectTi
 # 6) Prompt for further informations
 Write-Info 'Prompting for further informations'
 do {
-  $sudoPassword = Read-Secret -Message 'SUDO password'
-  if ([string]::IsNullOrWhiteSpace($sudoPassword)) {
+  $sudoPasswordPlain = Read-Secret -Message 'SUDO password'
+  if ([string]::IsNullOrWhiteSpace($sudoPasswordPlain)) {
     Write-Warn 'Password cannot be empty. Please enter a value.'
   }
-} until (-not [string]::IsNullOrWhiteSpace($sudoPassword))
+} until (-not [string]::IsNullOrWhiteSpace($sudoPasswordPlain))
+$sudoPassword = ConvertTo-SecureString $sudoPasswordPlain -AsPlainText -Force
 $sudoPassword = Test-RemoteSudo -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -SudoPassword $sudoPassword
 Write-Success "SUDO password ok."
 
@@ -352,11 +367,12 @@ if ($hasExistingCompose) {
 
 # 11) Prepare remote host
 Write-Info 'Prepare remote host'
+$sudoPasswordPlain = ConvertFrom-SecureStringPlainText -SecureText $sudoPassword
 
 $prepEnvAssignments = @(
   "REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'"
   'SUDO=''sudo -S -p ""'''
-  "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPassword)'"
+  "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPasswordPlain)'"
 ) -join ' '
 
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
@@ -384,7 +400,7 @@ Write-Success "Sync via '$method' completed."
 $deployEnvAssignments = @(
   "REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'"
   'SUDO=''sudo -S -p ""'''
-  "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPassword)'"
+  "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPasswordPlain)'"
 ) -join ' '
 
 $deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"
