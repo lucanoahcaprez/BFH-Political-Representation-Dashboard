@@ -70,9 +70,9 @@ invoke_sync_strategy() {
   fi
 
   local ssh_target="${user}@${server}"
-  local staging
+  local staging=""
   staging="$(mktemp -d)"
-  trap 'rm -rf "$staging"' RETURN
+  trap 'tmp="${staging:-}"; [ -n "$tmp" ] && rm -rf "$tmp"' RETURN
 
   copy_with_exclude_node_modules "$local_root/backend" "$staging/backend"
   copy_with_exclude_node_modules "$local_root/frontend" "$staging/frontend"
