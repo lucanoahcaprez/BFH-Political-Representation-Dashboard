@@ -30,6 +30,7 @@ LOG_FILE="$LOG_DIR/prepare_remote.log"
 
 SUDO_CMD=""
 
+# TODO: FIX sorry, wrong password even if correct
 # Sudo handling:
 # - If running as root -> no sudo needed
 # - If not root -> always use sudo -S -p '' and REQUIRE SUDO_PASSWORD
