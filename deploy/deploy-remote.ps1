@@ -279,6 +279,7 @@ $sshhost = Read-Value -Message 'SSH host'
 $portInput = Read-Value -Message 'SSH port' -Default '22'
 $port = [int]$portInput
 $user = Read-Value -Message 'SSH user'
+$isRootUser = ($user -eq 'root')
 
 # 3) Try SSH with an existing key first; only install/generate on fallback.
 $keyInfo = Test-LocalSshKey
@@ -315,17 +316,22 @@ Write-Info "Copy remote tasks to $remoteTasksDir"
 Initialize-RemoteTaskScripts -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir
 
 
-# 6) Prompt for further informations
-Write-Info 'Prompting for further informations'
-do {
-  $sudoPasswordPlain = Read-Secret -Message 'SUDO password'
-  if ([string]::IsNullOrWhiteSpace($sudoPasswordPlain)) {
-    Write-Warn 'Password cannot be empty. Please enter a value.'
-  }
-} until (-not [string]::IsNullOrWhiteSpace($sudoPasswordPlain))
-$sudoPassword = ConvertTo-SecureString $sudoPasswordPlain -AsPlainText -Force
-$sudoPassword = Test-RemoteSudo -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -SudoPassword $sudoPassword
-Write-Success "SUDO password ok."
+# 6) Prompt for further informations (skip sudo if connecting as root)
+$sudoPassword = $null
+if (-not $isRootUser) {
+  Write-Info 'Prompting for further informations'
+  do {
+    $sudoPasswordPlain = Read-Secret -Message 'SUDO password'
+    if ([string]::IsNullOrWhiteSpace($sudoPasswordPlain)) {
+      Write-Warn 'Password cannot be empty. Please enter a value.'
+    }
+  } until (-not [string]::IsNullOrWhiteSpace($sudoPasswordPlain))
+  $sudoPassword = ConvertTo-SecureString $sudoPasswordPlain -AsPlainText -Force
+  $sudoPassword = Test-RemoteSudo -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -SudoPassword $sudoPassword
+  Write-Success "SUDO password ok."
+} else {
+  Write-Info 'Connected as root; skipping sudo password prompt.'
+}
 
 # 7) Prompt for remote directory and optional shutdown
 $remoteDir = Read-Value -Message 'Remote deploy directory' -Default '/opt/political-dashboard'
@@ -381,11 +387,14 @@ if ($hasExistingCompose) {
 Write-Info 'Prepare remote host'
 $sudoPasswordPlain = ConvertFrom-SecureStringPlainText -SecureText $sudoPassword
 
-$prepEnvAssignments = @(
-  "REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'"
-  'SUDO=''sudo -S -p ""'''
-  "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPasswordPlain)'"
-) -join ' '
+$prepEnvAssignments = @("REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'")
+if (-not $isRootUser) {
+  $prepEnvAssignments += 'SUDO=''sudo -S -p ""'''
+  if ($sudoPasswordPlain) {
+    $prepEnvAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPasswordPlain)'"
+  }
+}
+$prepEnvAssignments = $prepEnvAssignments -join ' '
 
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
 $remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh'"
@@ -409,11 +418,14 @@ Write-Success "Sync via '$method' completed."
 
 
 # 13) Deploy application on remote host
-$deployEnvAssignments = @(
-  "REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'"
-  'SUDO=''sudo -S -p ""'''
-  "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPasswordPlain)'"
-) -join ' '
+$deployEnvAssignments = @("REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'")
+if (-not $isRootUser) {
+  $deployEnvAssignments += 'SUDO=''sudo -S -p ""'''
+  if ($sudoPasswordPlain) {
+    $deployEnvAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPasswordPlain)'"
+  }
+}
+$deployEnvAssignments = $deployEnvAssignments -join ' '
 
 $deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $deployCmd

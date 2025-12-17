@@ -114,6 +114,10 @@ ssh_host="$(read_value "SSH host")"
 port_input="$(read_value "SSH port" "22")"
 ssh_port="${port_input:-22}"
 ssh_user="$(read_value "SSH user")"
+is_root_user=false
+if [ "$ssh_user" = "root" ]; then
+  is_root_user=true
+fi
 
 # 3) Try SSH with an existing key first; only install/generate on fallback.
 default_key_path="$HOME/.ssh/id_ed25519"
@@ -150,17 +154,21 @@ invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS"
 log_info "Copy remote tasks to $REMOTE_TASKS_DIR"
 initialize_remote_task_scripts "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$SCRIPT_DIR/ssh_tasks"
 
-# 6) Prompt for further informations
-log_info "Prompting for further informations"
+# 6) Prompt for further informations (skip sudo when connecting as root)
 sudo_password=""
-while [ -z "$sudo_password" ]; do
-  sudo_password="$(read_secret "SUDO password")"
-  if [ -z "$sudo_password" ]; then
-    log_warn "Password cannot be empty. Please enter a value."
-  fi
-done
-sudo_password="$(test_remote_sudo "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$sudo_password" "$CHECK_SUDO_SCRIPT_NAME")"
-log_success "SUDO password ok."
+if [ "$is_root_user" = false ]; then
+  log_info "Prompting for further informations"
+  while [ -z "$sudo_password" ]; do
+    sudo_password="$(read_secret "SUDO password")"
+    if [ -z "$sudo_password" ]; then
+      log_warn "Password cannot be empty. Please enter a value."
+    fi
+  done
+  sudo_password="$(test_remote_sudo "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$sudo_password" "$CHECK_SUDO_SCRIPT_NAME")"
+  log_success "SUDO password ok."
+else
+  log_info "Connected as root; skipping sudo password prompt."
+fi
 
 # 7) Prompt for remote directory and optional shutdown
 remote_dir="$(read_value "Remote deploy directory" "/opt/political-dashboard")"
@@ -216,7 +224,11 @@ fi
 
 # 11) Prepare remote host
 log_info "Prepare remote host"
-prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && REMOTE_DIR='$(escape_squotes "$remote_dir")' SUDO_PASSWORD='$(escape_squotes "$sudo_password")' bash 'prepare_remote.sh'"
+prep_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
+if [ "$is_root_user" = false ]; then
+  prep_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
+fi
+prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && ${prep_cmd_env[*]} bash 'prepare_remote.sh'"
 log_info "Prepare remote: running prepare_remote.sh on $ssh_host"
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$prep_cmd"
 log_success "Remote preparation complete."
@@ -226,7 +238,11 @@ invoke_deployment_sync "$method" "$ssh_user" "$ssh_host" "$ssh_port" "$remote_di
 log_success "Sync via '$method' completed."
 
 # 13) Deploy application on remote host
-deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && REMOTE_DIR='$(escape_squotes "$remote_dir")' SUDO_PASSWORD='$(escape_squotes "$sudo_password")' bash 'deploy.sh'"
+deploy_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
+if [ "$is_root_user" = false ]; then
+  deploy_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
+fi
+deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${deploy_cmd_env[*]} bash 'deploy.sh'"
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$deploy_cmd"
 log_success "Remote deploy executed."
 
