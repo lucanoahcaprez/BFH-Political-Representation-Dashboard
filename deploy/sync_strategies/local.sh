@@ -26,7 +26,7 @@ copy_with_exclude_node_modules() {
   require_cmd rsync
   mkdir -p "$destination"
   # rsync is used to mimic robocopy /MIR while skipping node_modules.
-  rsync -a --delete --exclude 'node_modules' "$source_dir/" "$destination/"
+  rsync -a --delete --exclude 'node_modules' --quiet "$source_dir/" "$destination/"
 }
 
 invoke_sync_strategy() {
@@ -83,6 +83,7 @@ invoke_sync_strategy() {
   local destination="$ssh_target:$remote_dir/"
   local scp_args=(
     -P "$port"
+    -q
     -o StrictHostKeyChecking=accept-new
     -r
     "$staging/backend"

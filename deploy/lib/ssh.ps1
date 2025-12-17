@@ -21,6 +21,7 @@ function Test-SshConnection {
   $arguments = @(
     '-p', $Port,
     '-o', "PreferredAuthentications=$authModes",
+    '-o', 'LogLevel=ERROR',
     '-o', 'StrictHostKeyChecking=accept-new',
     '-o', 'BatchMode=yes',
     '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
@@ -45,6 +46,7 @@ function Invoke-SshScript {
   $arguments = @(
     '-p', $Port,
     '-o', 'PreferredAuthentications=publickey,password',
+    '-o', 'LogLevel=ERROR',
     '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
     '-o', 'StrictHostKeyChecking=accept-new',
     "$User@$Server",
@@ -70,6 +72,7 @@ function Invoke-SshScriptOutput {
   $arguments = @(
     '-p', $Port,
     '-o', 'PreferredAuthentications=publickey,password',
+    '-o', 'LogLevel=ERROR',
     '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
     '-o', 'StrictHostKeyChecking=accept-new',
     "$User@$Server",

@@ -44,6 +44,7 @@ LOG_FILE="$LOG_DIR/deploy-remote-$(date +%Y%m%d-%H%M%S).log"
 set_ui_log_file "$LOG_FILE"
 set_ui_info_visibility true
 log_success "Logging deployment details to $LOG_FILE"
+log_info "This run will: (1) verify SSH access, (2) prepare the remote host, (3) sync project files, (4) deploy Docker Compose. Detailed output goes to the log file."
 
 REMOTE_TASKS_DIR="/tmp/pol-dashboard-tasks"
 CHECK_SCRIPT_NAME="check_remote_compose.sh"
@@ -103,16 +104,19 @@ invoke_deployment_sync() {
 }
 
 # 1) Check dependencies
-log_info "Checking dependency on $(hostname)"
+log_info "Step: Local prerequisites (ssh, scp, ssh-keygen) on $(hostname)"
 require_cmd ssh
 require_cmd scp
 require_cmd ssh-keygen
 
 # 2) Ask for SSH connection details
-log_info "Read connection details for ssh"
+log_info "Step: Connection setup"
+log_info "Action: enter the hostname or IP of the remote server."
 ssh_host="$(read_value "SSH host")"
+log_info "Action: enter the SSH port (press Enter to keep 22)."
 port_input="$(read_value "SSH port" "22")"
 ssh_port="${port_input:-22}"
+log_info "Action: enter the SSH user (use root to skip sudo prompts later)."
 ssh_user="$(read_value "SSH user")"
 is_root_user=false
 if [ "$ssh_user" = "root" ]; then
@@ -157,7 +161,8 @@ initialize_remote_task_scripts "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIM
 # 6) Prompt for further informations (skip sudo when connecting as root)
 sudo_password=""
 if [ "$is_root_user" = false ]; then
-  log_info "Prompting for further informations"
+  log_info "Step: Permissions"
+  log_info "Action: provide the sudo password so we can install packages and manage Docker."
   while [ -z "$sudo_password" ]; do
     sudo_password="$(read_secret "SUDO password")"
     if [ -z "$sudo_password" ]; then
@@ -171,6 +176,8 @@ else
 fi
 
 # 7) Prompt for remote directory and optional shutdown
+log_info "Step: Choose where the app will live on the server (e.g., /opt/political-dashboard)."
+log_info "Action: pick a writable path on the remote host. We will create it if missing."
 remote_dir="$(read_value "Remote deploy directory" "/opt/political-dashboard")"
 log_info "Prepare remote helper directory $REMOTE_TASKS_DIR"
 
@@ -189,7 +196,8 @@ if [ "$SHUTDOWN" = true ]; then
 fi
 
 # 9) Create/update local .env.deploy
-log_info "Gather input for creation of .env.deploy"
+log_info "Step: Create or confirm deployment environment values (.env.deploy)"
+log_info "Action: confirm defaults or customize ports/app domain used by docker-compose."
 use_env_defaults=false
 if confirm_action "Use default environment values (ports 8080/3000/5432, postgres user)?"; then
   use_env_defaults=true
@@ -206,7 +214,7 @@ if [ ! -f "$env_deploy_path" ]; then
 fi
 
 # 10) Ask deployment method (local only for now)
-method="$(read_choice "Deployment method? [local]" "local")"
+method="$(read_choice "Step: Deployment method? [local]" "local")"
 log_info "Selected method: $method"
 
 has_existing_compose=false
@@ -228,12 +236,13 @@ prep_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
 if [ "$is_root_user" = false ]; then
   prep_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
 fi
-prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && ${prep_cmd_env[*]} bash 'prepare_remote.sh'"
-log_info "Prepare remote: running prepare_remote.sh on $ssh_host"
+prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && ${prep_cmd_env[*]} bash 'prepare_remote.sh' > /dev/null 2>&1"
+log_info "Prepare remote: running prepare_remote.sh quietly (details in $LOG_FILE)"
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$prep_cmd"
 log_success "Remote preparation complete."
 
 # 12) Sync project using selected strategy
+log_info "Syncing project files to ${ssh_host}:${remote_dir} (quiet; details in $LOG_FILE)"
 invoke_deployment_sync "$method" "$ssh_user" "$ssh_host" "$ssh_port" "$remote_dir" "$SCRIPT_DIR" "$env_deploy_path"
 log_success "Sync via '$method' completed."
 
@@ -242,7 +251,7 @@ deploy_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
 if [ "$is_root_user" = false ]; then
   deploy_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
 fi
-deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${deploy_cmd_env[*]} bash 'deploy.sh'"
+deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${deploy_cmd_env[*]} bash 'deploy.sh' > /dev/null 2>&1"
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$deploy_cmd"
 log_success "Remote deploy executed."
 

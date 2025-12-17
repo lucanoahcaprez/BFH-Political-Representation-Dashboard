@@ -23,6 +23,7 @@ test_ssh_connection() {
   local args=(
     -p "$port"
     -o "PreferredAuthentications=$auth_mode"
+    -o LogLevel=ERROR
     -o StrictHostKeyChecking=accept-new
     -o BatchMode=yes
     -o "ConnectTimeout=$timeout"
@@ -46,6 +47,7 @@ invoke_ssh_script() {
   local args=(
     -p "$port"
     -o PreferredAuthentications=publickey,password
+    -o LogLevel=ERROR
     -o "ConnectTimeout=$timeout"
     -o StrictHostKeyChecking=accept-new
     "$user@$server"
@@ -67,6 +69,7 @@ invoke_ssh_script_output() {
   local args=(
     -p "$port"
     -o PreferredAuthentications=publickey,password
+    -o LogLevel=ERROR
     -o "ConnectTimeout=$timeout"
     -o StrictHostKeyChecking=accept-new
     "$user@$server"
@@ -95,6 +98,7 @@ copy_remote_script() {
 
   local args=(
     -P "$port"
+    -q
     -o StrictHostKeyChecking=accept-new
     -o "ConnectTimeout=$timeout"
     "$temp"

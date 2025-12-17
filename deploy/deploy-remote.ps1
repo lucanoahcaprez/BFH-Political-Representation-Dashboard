@@ -18,8 +18,9 @@ if (-not (Test-Path $logDir)) {
 }
 $logFile = Join-Path $logDir ("deploy-remote-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 Set-UiLogFile -Path $logFile
-Set-UiInfoVisibility -Visible:$false
+Set-UiInfoVisibility -Visible:$true
 Write-Success "Logging deployment details to $logFile"
+Write-Info "This run will: (1) verify SSH access, (2) prepare the remote host, (3) sync project files, (4) deploy Docker Compose. Detailed output goes to the log file."
 
 $remoteTasksDir = "/tmp/pol-dashboard-tasks"
 $checkScriptName = 'check_remote_compose.sh'
@@ -85,6 +86,7 @@ function Copy-RemoteScript {
     [System.IO.File]::WriteAllText($temp, $content, $utf8NoBom)
     $arguments = @(
       '-P', $Port,
+      '-q',
       '-o', 'StrictHostKeyChecking=accept-new',
       '-o', "ConnectTimeout=$ConnectTimeoutSeconds",
       $temp,
@@ -268,16 +270,19 @@ function Invoke-DeploymentSync {
 }
 
 # 1) Check dependencies
-Write-Info "Checking dependency on $ENV:COMPUTERNAME"
+Write-Info "Step: Local prerequisites (ssh, scp, ssh-keygen) on $ENV:COMPUTERNAME"
 Test-Command 'ssh'
 Test-Command 'scp'
 Test-Command 'ssh-keygen'
 
 # 2) Ask for SSH connection details
-Write-Info "Read connection details for ssh"
+Write-Info "Step: Connection setup"
+Write-Info "Action: enter the hostname or IP of the remote server."
 $sshhost = Read-Value -Message 'SSH host'
+Write-Info "Action: enter the SSH port (press Enter to keep 22)."
 $portInput = Read-Value -Message 'SSH port' -Default '22'
 $port = [int]$portInput
+Write-Info "Action: enter the SSH user (use root to skip sudo prompts later)."
 $user = Read-Value -Message 'SSH user'
 $isRootUser = ($user -eq 'root')
 
@@ -319,7 +324,8 @@ Initialize-RemoteTaskScripts -User $user -Server $sshhost -Port $port -ConnectTi
 # 6) Prompt for further informations (skip sudo if connecting as root)
 $sudoPassword = $null
 if (-not $isRootUser) {
-  Write-Info 'Prompting for further informations'
+  Write-Info 'Step: Permissions'
+  Write-Info 'Action: provide the sudo password so we can install packages and manage Docker.'
   do {
     $sudoPasswordPlain = Read-Secret -Message 'SUDO password'
     if ([string]::IsNullOrWhiteSpace($sudoPasswordPlain)) {
@@ -334,6 +340,8 @@ if (-not $isRootUser) {
 }
 
 # 7) Prompt for remote directory and optional shutdown
+Write-Info "Step: Choose where the app will live on the server (e.g., /opt/political-dashboard)."
+Write-Info "Action: pick a writable path on the remote host. We will create it if missing."
 $remoteDir = Read-Value -Message 'Remote deploy directory' -Default '/opt/political-dashboard'
 
 Write-Info "Prepare remote helper directory $remoteTasksDir"
@@ -357,7 +365,8 @@ if ($Shutdown) {
 
 
 # 9) Create/update local .env.deploy
-Write-Info 'Gather input for creation of .env.deploy'
+Write-Info 'Step: Create or confirm deployment environment values (.env.deploy)'
+Write-Info 'Action: confirm defaults or customize ports/app domain used by docker-compose.'
 $useEnvDefaults = Confirm-Action -Message 'Use default environment values (ports 8080/3000/5432, postgres user)?'
 $createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
 $envFile = & $createEnv -UseDefaults:$useEnvDefaults
@@ -369,7 +378,7 @@ if (-not (Test-Path $envDeployPath)) {
 $envValues = Read-EnvDeployValues -Path $envDeployPath
 
 # 10) Ask deployment method (placeholder)
-$method = Read-Choice -Message 'Deployment method? [local|git]' -Options @('local', 'git', 'archive')
+$method = Read-Choice -Message 'Step: Deployment method? [local|git|archive]' -Options @('local', 'git', 'archive')
 Write-Info "Selected method: $method"
 
 
@@ -397,13 +406,15 @@ if (-not $isRootUser) {
 $prepEnvAssignments = $prepEnvAssignments -join ' '
 
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
-$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh'"
-Write-Info "Prepare remote: execute ssh command - $remoteCmd"
+$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh' > /dev/null 2>&1"
+Write-Info "Prepare remote: running prepare_remote.sh quietly (details in $logFile)"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $remoteCmd
 Write-Success 'Remote preparation complete.'
 
 
 # 12) Sync project using selected strategy
+$syncTargetLabel = "$sshhost`:$remoteDir"
+Write-Info "Syncing project files to $syncTargetLabel (quiet; details in $logFile)"
 $syncContext = @{
   Method     = $method
   User       = $user
@@ -427,7 +438,7 @@ if (-not $isRootUser) {
 }
 $deployEnvAssignments = $deployEnvAssignments -join ' '
 
-$deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"
+$deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh' > /dev/null 2>&1"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $deployCmd
 Write-Success 'Remote deploy executed.'
 
