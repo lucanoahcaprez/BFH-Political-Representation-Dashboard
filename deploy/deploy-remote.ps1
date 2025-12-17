@@ -281,9 +281,10 @@ $port = [int]$portInput
 $user = Read-Value -Message 'SSH user'
 
 # 3) Try SSH with an existing key first; only install/generate on fallback.
-$defaultKeyPath = Join-Path $HOME '.ssh\id_ed25519'
-$pubKeyPath = "$defaultKeyPath.pub"
-$hasLocalKey = Test-Path $defaultKeyPath
+$keyInfo = Test-LocalSshKey
+$defaultKeyPath = $keyInfo.PrivatePath
+$pubKeyPath = $keyInfo.PublicPath
+$hasLocalKey = -not $keyInfo.Generated
 $connectedWithKey = $false
 
 if ($hasLocalKey) {
@@ -294,7 +295,6 @@ if ($hasLocalKey) {
 if (-not $connectedWithKey) {
   Write-Info 'SSH key authentication not available; falling back to password to install key.'
   Write-Info "Ensure local sshkey is present"
-  $pubKeyPath = Test-LocalSshKey
   Write-Info "Try to install public-key on $sshhost"
   Install-PublicKeyRemote -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -PublicKeyPath $pubKeyPath
 
