@@ -19,6 +19,15 @@ function Set-UiInfoVisibility {
   $script:ShowInfoOnConsole = $Visible
 }
 
+function Write-Section {
+  param([Parameter(Mandatory = $true)][string]$Title)
+  $line = '-' * 64
+  Write-Host ''
+  Write-Host $line
+  Write-Host "> $Title"
+  Write-Host $line
+}
+
 function Write-ColoredPrompt {
   param(
     [Parameter(Mandatory = $true)][string]$Message,
@@ -37,26 +46,44 @@ function Write-LogLine {
     [bool]$ForceConsole = $false
   )
 
-  $line = "[$(Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")] [$ENV:COMPUTERNAME] [$Level] $Message"
+  $safeMessage = $Message -replace "SUDO_PASSWORD='[^']*'", "SUDO_PASSWORD='***'" -replace "SUDO_PASSWORD=[^ ]*", 'SUDO_PASSWORD=***'
+  $line = "[$(Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")] [$ENV:COMPUTERNAME] [$Level] $safeMessage"
   if ($script:UiLogFile) {
     Add-Content -Path $script:UiLogFile -Value $line
   }
 
   $shouldWrite = $ForceConsole -or $script:ShowInfoOnConsole -or $Level -ne 'INFO'
   if ($shouldWrite) {
-    if ($null -ne $Color) {
-      Write-Host $line -ForegroundColor $Color
-      # Flush input buffer (Enter key leftover) - credits: GPT 5.1
-      while ([Console]::KeyAvailable) {
-          [Console]::ReadKey($true) | Out-Null
-      }
-    } else {
-      Write-Host $line
-      # Flush input buffer (Enter key leftover) - credits: GPT 5.1
-      while ([Console]::KeyAvailable) {
-          [Console]::ReadKey($true) | Out-Null
-      }
+    $prefix = switch ($Level) {
+      'INFO'    { '-' }
+      'SUCCESS' { '[OK]' }
+      'WARN'    { '[WARN]' }
+      'ERROR'   { '[ERR]' }
+      default   { $Level }
     }
+    $consoleLine = "$prefix $safeMessage"
+    if ($null -ne $Color) {
+      Write-Host $consoleLine -ForegroundColor $Color
+    } else {
+      Write-Host $consoleLine
+    }
+    # Flush input buffer (Enter key leftover)
+    while ([Console]::KeyAvailable) {
+      [Console]::ReadKey($true) | Out-Null
+    }
+  }
+}
+
+# require prompt (null values not allowed)
+function Read-RequiredValue{
+  param(
+    [Parameter(Mandatory = $true)][string]$Message,
+    [string]$Default = $null
+  )
+  while ($true) {
+    $value = Read-Value -Message $Message -Default $Default
+    if (-not [string]::IsNullOrWhiteSpace($value)) { return $value }
+    Write-Warn 'Please enter a value.'
   }
 }
 

@@ -19,8 +19,8 @@ if (-not (Test-Path $logDir)) {
 $logFile = Join-Path $logDir ("deploy-remote-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 Set-UiLogFile -Path $logFile
 Set-UiInfoVisibility -Visible:$true
-Write-Success "Logging deployment details to $logFile"
-Write-Info "This run will: (1) verify SSH access, (2) prepare the remote host, (3) sync project files, (4) deploy Docker Compose. Detailed output goes to the log file."
+Write-Success "Logging to $logFile"
+Write-Info "Steps: SSH check -> remote prep -> sync project files -> deploy docker-compose (details in log file)."
 
 $remoteTasksDir = "/tmp/pol-dashboard-tasks"
 $checkScriptName = 'check_remote_compose.sh'
@@ -276,14 +276,11 @@ Test-Command 'scp'
 Test-Command 'ssh-keygen'
 
 # 2) Ask for SSH connection details
-Write-Info "Step: Connection setup"
-Write-Info "Action: enter the hostname or IP of the remote server."
-$sshhost = Read-Value -Message 'SSH host'
-Write-Info "Action: enter the SSH port (press Enter to keep 22)."
+Write-Section "Connection"
+$sshhost = Read-RequiredValue -Message 'Remote host (IP or DNS)'
 $portInput = Read-Value -Message 'SSH port' -Default '22'
 $port = [int]$portInput
-Write-Info "Action: enter the SSH user (use root to skip sudo prompts later)."
-$user = Read-Value -Message 'SSH user'
+$user = Read-RequiredValue -Message 'SSH user (root skips sudo prompts)'
 $isRootUser = ($user -eq 'root')
 
 # 3) Try SSH with an existing key first; only install/generate on fallback.
@@ -324,10 +321,10 @@ Initialize-RemoteTaskScripts -User $user -Server $sshhost -Port $port -ConnectTi
 # 6) Prompt for further informations (skip sudo if connecting as root)
 $sudoPassword = $null
 if (-not $isRootUser) {
-  Write-Info 'Step: Permissions'
-  Write-Info 'Action: provide the sudo password so we can install packages and manage Docker.'
+  Write-Section "Sudo access"
+  Write-Info 'Needed to install packages and manage Docker on the remote host.'
   do {
-    $sudoPasswordPlain = Read-Secret -Message 'SUDO password'
+    $sudoPasswordPlain = Read-Secret -Message 'Remote sudo password'
     if ([string]::IsNullOrWhiteSpace($sudoPasswordPlain)) {
       Write-Warn 'Password cannot be empty. Please enter a value.'
     }
@@ -340,9 +337,8 @@ if (-not $isRootUser) {
 }
 
 # 7) Prompt for remote directory and optional shutdown
-Write-Info "Step: Choose where the app will live on the server (e.g., /opt/political-dashboard)."
-Write-Info "Action: pick a writable path on the remote host. We will create it if missing."
-$remoteDir = Read-Value -Message 'Remote deploy directory' -Default '/opt/political-dashboard'
+Write-Section "Remote target"
+$remoteDir = Read-Value -Message 'Remote deploy directory (created if missing)' -Default '/opt/political-dashboard'
 
 Write-Info "Prepare remote helper directory $remoteTasksDir"
 
@@ -393,6 +389,7 @@ if ($hasExistingCompose) {
 }
 
 # 11) Prepare remote host
+Write-Section "Prepare remote host"
 Write-Info 'Prepare remote host'
 $sudoPasswordPlain = ConvertFrom-SecureStringPlainText -SecureText $sudoPassword
 
@@ -413,6 +410,7 @@ Write-Success 'Remote preparation complete.'
 
 
 # 12) Sync project using selected strategy
+Write-Section "Sync and deploy"
 $syncTargetLabel = "$sshhost`:$remoteDir"
 Write-Info "Syncing project files to $syncTargetLabel (quiet; details in $logFile)"
 $syncContext = @{
