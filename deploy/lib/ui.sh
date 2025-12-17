@@ -52,7 +52,7 @@ log_line() {
   if [ "$force_console" = "true" ] || [ "$SHOW_INFO" = "true" ] || [ "$level" != "INFO" ]; then
     local console_prefix=""
     case "$level" in
-      INFO) console_prefix="." ;;
+      INFO) console_prefix="-" ;;
       SUCCESS) console_prefix="[OK]" ;;
       WARN) console_prefix="[WARN]" ;;
       ERROR) console_prefix="[ERR]" ;;
