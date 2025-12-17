@@ -11,6 +11,19 @@ SHUTDOWN=false
 CONNECT_TIMEOUT_SECONDS=20
 CONNECT_DELAY_SECONDS=1
 
+prompt_required() {
+  local message="$1"
+  local default="${2:-}"
+  local value=""
+  while [ -z "$value" ]; do
+    value="$(read_value "$message" "$default")"
+    if [ -z "$value" ]; then
+      log_warn "Please enter a value."
+    fi
+  done
+  printf '%s' "$value"
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --shutdown)
@@ -43,8 +56,8 @@ mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/deploy-remote-$(date +%Y%m%d-%H%M%S).log"
 set_ui_log_file "$LOG_FILE"
 set_ui_info_visibility true
-log_success "Logging deployment details to $LOG_FILE"
-log_info "This run will: (1) verify SSH access, (2) prepare the remote host, (3) sync project files, (4) deploy Docker Compose. Detailed output goes to the log file."
+log_success "Logging to $LOG_FILE"
+log_info "Steps: SSH check → remote prep → sync project files → deploy docker-compose (details in log file)."
 
 REMOTE_TASKS_DIR="/tmp/pol-dashboard-tasks"
 CHECK_SCRIPT_NAME="check_remote_compose.sh"
@@ -110,14 +123,11 @@ require_cmd scp
 require_cmd ssh-keygen
 
 # 2) Ask for SSH connection details
-log_info "Step: Connection setup"
-log_info "Action: enter the hostname or IP of the remote server."
-ssh_host="$(read_value "SSH host")"
-log_info "Action: enter the SSH port (press Enter to keep 22)."
+section "Connection"
+ssh_host="$(prompt_required "Remote host (IP or DNS)")"
 port_input="$(read_value "SSH port" "22")"
 ssh_port="${port_input:-22}"
-log_info "Action: enter the SSH user (use root to skip sudo prompts later)."
-ssh_user="$(read_value "SSH user")"
+ssh_user="$(prompt_required "SSH user (root skips sudo prompts)")"
 is_root_user=false
 if [ "$ssh_user" = "root" ]; then
   is_root_user=true
@@ -161,24 +171,23 @@ initialize_remote_task_scripts "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIM
 # 6) Prompt for further informations (skip sudo when connecting as root)
 sudo_password=""
 if [ "$is_root_user" = false ]; then
-  log_info "Step: Permissions"
-  log_info "Action: provide the sudo password so we can install packages and manage Docker."
+  section "Sudo access"
+  log_info "Needed to install packages and manage Docker on the remote host."
   while [ -z "$sudo_password" ]; do
-    sudo_password="$(read_secret "SUDO password")"
+    sudo_password="$(read_secret "Remote sudo password")"
     if [ -z "$sudo_password" ]; then
       log_warn "Password cannot be empty. Please enter a value."
     fi
   done
   sudo_password="$(test_remote_sudo "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$sudo_password" "$CHECK_SUDO_SCRIPT_NAME")"
+  printf "\n"
   log_success "SUDO password ok."
 else
   log_info "Connected as root; skipping sudo password prompt."
 fi
-
 # 7) Prompt for remote directory and optional shutdown
-log_info "Step: Choose where the app will live on the server (e.g., /opt/political-dashboard)."
-log_info "Action: pick a writable path on the remote host. We will create it if missing."
-remote_dir="$(read_value "Remote deploy directory" "/opt/political-dashboard")"
+section "Remote target"
+remote_dir="$(read_value "Remote deploy directory (created if missing)" "/opt/political-dashboard")"
 log_info "Prepare remote helper directory $REMOTE_TASKS_DIR"
 
 # 8) Check if user wants to shutdown existing docker stack
@@ -214,9 +223,11 @@ if [ ! -f "$env_deploy_path" ]; then
 fi
 
 # 10) Ask deployment method (local only for now)
-method="$(read_choice "Step: Deployment method? [local]" "local")"
-log_info "Selected method: $method"
+# TODO: cleanup
+# method="$(read_choice "Step: Deployment method? [local]" "local")"
+# log_info "Selected method: $method"
 
+method="local"
 has_existing_compose=false
 if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME"; then
   has_existing_compose=true
@@ -231,6 +242,7 @@ if [ "$has_existing_compose" = true ]; then
 fi
 
 # 11) Prepare remote host
+section "Prepare remote host"
 log_info "Prepare remote host"
 prep_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
 if [ "$is_root_user" = false ]; then
@@ -242,6 +254,7 @@ invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS"
 log_success "Remote preparation complete."
 
 # 12) Sync project using selected strategy
+section "Sync and deploy"
 log_info "Syncing project files to ${ssh_host}:${remote_dir} (quiet; details in $LOG_FILE)"
 invoke_deployment_sync "$method" "$ssh_user" "$ssh_host" "$ssh_port" "$remote_dir" "$SCRIPT_DIR" "$env_deploy_path"
 log_success "Sync via '$method' completed."

@@ -13,6 +13,12 @@ set_ui_info_visibility() {
   SHOW_INFO=$([ "$visible" = "true" ] && echo true || echo false)
 }
 
+section() {
+  local title="$1"
+  local line="----------------------------------------------------------------"
+  printf '\n%s\n> %s\n%s\n' "$line" "$title" "$line"
+}
+
 __ui_color() {
   local color="$1"
   case "$color" in
@@ -32,23 +38,33 @@ log_line() {
   local color="${LOG_COLOR:-}"
   local force_console="${FORCE_CONSOLE:-false}"
 
-  local ts host line sanitized
+  local ts host line sanitized safe_message
   ts="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
   host="$(hostname 2>/dev/null || echo 'local')"
-  line="[$ts] [$host] [$level] $message"
-  sanitized="$(printf '%s' "$line" | sed -E "s/SUDO_PASSWORD='[^']*'/SUDO_PASSWORD='***'/g; s/SUDO_PASSWORD=[^ ]*/SUDO_PASSWORD=***/g")"
+  safe_message="$(printf '%s' "$message" | sed -E "s/SUDO_PASSWORD='[^']*'/SUDO_PASSWORD='***'/g; s/SUDO_PASSWORD=[^ ]*/SUDO_PASSWORD=***/g")"
+  line="[$ts] [$host] [$level] $safe_message"
+  sanitized="$(printf '%s' "$line")"
 
   if [ -n "$UI_LOG_FILE" ]; then
     printf '%s\n' "$sanitized" >>"$UI_LOG_FILE" || true
   fi
 
   if [ "$force_console" = "true" ] || [ "$SHOW_INFO" = "true" ] || [ "$level" != "INFO" ]; then
+    local console_prefix=""
+    case "$level" in
+      INFO) console_prefix="." ;;
+      SUCCESS) console_prefix="[OK]" ;;
+      WARN) console_prefix="[WARN]" ;;
+      ERROR) console_prefix="[ERR]" ;;
+      *) console_prefix="$level" ;;
+    esac
+    local console_line="$console_prefix $safe_message"
     if [ -t 1 ] && [ -n "$color" ]; then
       __ui_color "$color"
-      printf '%s\n' "$sanitized"
+      printf '%s\n' "$console_line"
       __ui_color "reset"
     else
-      printf '%s\n' "$sanitized"
+      printf '%s\n' "$console_line"
     fi
   fi
 }
