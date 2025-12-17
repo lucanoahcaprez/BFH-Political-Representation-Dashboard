@@ -374,9 +374,10 @@ if (-not (Test-Path $envDeployPath)) {
 $envValues = Read-EnvDeployValues -Path $envDeployPath
 
 # 10) Ask deployment method (placeholder)
-$method = Read-Choice -Message 'Step: Deployment method? [local|git|archive]' -Options @('local', 'git', 'archive')
-Write-Info "Selected method: $method"
-
+# TODO: cleanup dont read the options
+# $method = Read-Choice -Message 'Step: Deployment method? [local|git|archive]' -Options @('local', 'git', 'archive')
+# Write-Info "Selected method: $method"
+$method = "local"
 
 $hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
 

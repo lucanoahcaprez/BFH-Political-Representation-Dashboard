@@ -57,7 +57,7 @@ LOG_FILE="$LOG_DIR/deploy-remote-$(date +%Y%m%d-%H%M%S).log"
 set_ui_log_file "$LOG_FILE"
 set_ui_info_visibility true
 log_success "Logging to $LOG_FILE"
-log_info "Steps: SSH check → remote prep → sync project files → deploy docker-compose (details in log file)."
+log_info "Steps: SSH check -> remote prep -> sync project files -> deploy docker-compose (details in log file)."
 
 REMOTE_TASKS_DIR="/tmp/pol-dashboard-tasks"
 CHECK_SCRIPT_NAME="check_remote_compose.sh"
