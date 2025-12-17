@@ -11,6 +11,25 @@ SHUTDOWN=false
 CONNECT_TIMEOUT_SECONDS=20
 CONNECT_DELAY_SECONDS=1
 
+print_deploy_header() {
+  local divider="===================================================================="
+  cat <<EOF
+$divider
+  Political Representation Dashboard - Remote Deployment
+  Authors : Elia Bucher, Luca Noah Caprez, Pascal Feller (BFH student project)
+  License : MIT (see LICENSE)
+  Logs    : $SCRIPT_DIR/logs (per-run file announced below)
+  Usage   : $(basename "$0") [--shutdown] [--connect-timeout SECONDS] [--connect-delay SECONDS]
+            --shutdown stops the existing remote docker-compose stack, then exits.
+  Steps   :
+    1) Check local SSH/scp prerequisites and reachability
+    2) Prepare the remote host (helper scripts, packages, Docker)
+    3) Sync project files and deployment env vars
+    4) Deploy docker-compose and print URLs/log paths
+$divider
+EOF
+}
+
 prompt_required() {
   local message="$1"
   local default="${2:-}"
@@ -51,13 +70,15 @@ EOF
   esac
 done
 
+print_deploy_header
+log_info "Starting remote deployment script."
+
 LOG_DIR="$SCRIPT_DIR/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/deploy-remote-$(date +%Y%m%d-%H%M%S).log"
 set_ui_log_file "$LOG_FILE"
 set_ui_info_visibility true
-log_success "Logging to $LOG_FILE"
-log_info "Steps: SSH check -> remote prep -> sync project files -> deploy docker-compose (details in log file)."
+log_info "Logging to $LOG_FILE"
 
 REMOTE_TASKS_DIR="/tmp/pol-dashboard-tasks"
 CHECK_SCRIPT_NAME="check_remote_compose.sh"
@@ -117,7 +138,7 @@ invoke_deployment_sync() {
 }
 
 # 1) Check dependencies
-log_info "Step: Local prerequisites (ssh, scp, ssh-keygen) on $(hostname)"
+log_info "Check local prerequisites (ssh, scp, ssh-keygen) on $(hostname)"
 require_cmd ssh
 require_cmd scp
 require_cmd ssh-keygen

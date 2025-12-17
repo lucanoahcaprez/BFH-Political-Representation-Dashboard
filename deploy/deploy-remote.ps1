@@ -12,15 +12,39 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\ssh.ps1')
 . (Join-Path $PSScriptRoot 'lib\ui.ps1')
 
+function Print-DeployHeader {
+  param(
+    [string]$LogDir
+  )
+  $divider = '=' * 68
+  $scriptName = Split-Path -Leaf $PSCommandPath
+  @"
+$divider
+  Political Representation Dashboard - Remote Deployment
+  Authors : Elia Bucher, Luca Noah Caprez, Pascal Feller (BFH student project)
+  License : MIT (see LICENSE)
+  Logs    : $LogDir (per-run file announced below)
+  Usage   : .\$scriptName [-Shutdown] [-ConnectTimeoutSeconds <int>] [-ConnectDelaySeconds <int>]
+            -Shutdown stops the existing remote docker-compose stack, then exits.
+  Steps   :
+    1) Check local SSH/scp prerequisites and reachability
+    2) Prepare the remote host (helper scripts, packages, Docker)
+    3) Sync project files and deployment env vars
+    4) Deploy docker-compose and print URLs/log paths
+$divider
+"@ | Write-Host
+}
+
 $logDir = Join-Path $PSScriptRoot 'logs'
 if (-not (Test-Path $logDir)) {
   New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 }
+$null = Print-DeployHeader -LogDir $logDir
+Write-Info 'Starting remote deployment script.'
 $logFile = Join-Path $logDir ("deploy-remote-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 Set-UiLogFile -Path $logFile
 Set-UiInfoVisibility -Visible:$true
-Write-Success "Logging to $logFile"
-Write-Info "Steps: SSH check -> remote prep -> sync project files -> deploy docker-compose (details in log file)."
+Write-Info "Logging to $logFile"
 
 $remoteTasksDir = "/tmp/pol-dashboard-tasks"
 $checkScriptName = 'check_remote_compose.sh'
@@ -270,7 +294,7 @@ function Invoke-DeploymentSync {
 }
 
 # 1) Check dependencies
-Write-Info "Step: Local prerequisites (ssh, scp, ssh-keygen) on $ENV:COMPUTERNAME"
+Write-Info "check local prerequisites (ssh, scp, ssh-keygen) on $ENV:COMPUTERNAME"
 Test-Command 'ssh'
 Test-Command 'scp'
 Test-Command 'ssh-keygen'
