@@ -115,19 +115,34 @@ port_input="$(read_value "SSH port" "22")"
 ssh_port="${port_input:-22}"
 ssh_user="$(read_value "SSH user")"
 
-# 3) Ensure keypair locally and install pubkey remotely (one-time password)
-log_info "Ensure local sshkey is present"
-pub_key_path="$(ensure_local_ssh_key)"
-log_info "Try to install public-key on $ssh_host"
-install_public_key_remote "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$pub_key_path"
+# 3) Try SSH with an existing key first; only install/generate on fallback.
+default_key_path="$HOME/.ssh/id_ed25519"
+pub_key_path="$default_key_path.pub"
+connected_with_key=false
 
-# 4) Test SSH connectivity (should use key now)
-log_info "Testing ssh connection with key"
-if ! test_ssh_connection "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS"; then
-  log_error "SSH connection failed after key install. Aborting."
-  exit 1
+if [ -f "$default_key_path" ] && [ -f "$pub_key_path" ]; then
+  log_info "Testing ssh connection with existing key at $default_key_path"
+  if test_ssh_connection "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "publickey"; then
+    connected_with_key=true
+  fi
 fi
-log_success "SSH connection with key OK."
+
+if [ "$connected_with_key" != true ]; then
+  log_info "SSH key authentication not available; falling back to password to install key."
+  log_info "Ensure local sshkey is present"
+  pub_key_path="$(ensure_local_ssh_key)"
+  log_info "Try to install public-key on $ssh_host"
+  install_public_key_remote "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$pub_key_path"
+
+  log_info "Testing ssh connection with key after install"
+  if ! test_ssh_connection "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "publickey"; then
+    log_error "SSH connection failed after key install. Aborting."
+    exit 1
+  fi
+  log_success "SSH connection with key OK."
+else
+  log_success "SSH connection with existing key OK."
+fi
 
 # 5) Copy all necessary remote task scripts
 log_info "Create remote task directory ($REMOTE_TASKS_DIR)"

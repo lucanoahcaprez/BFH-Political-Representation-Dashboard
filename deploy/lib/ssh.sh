@@ -18,10 +18,13 @@ test_ssh_connection() {
   local server="$2"
   local port="${3:-22}"
   local timeout="${4:-20}"
+  local auth_mode="${5:-publickey,password}"
 
   local args=(
     -p "$port"
-    -o PreferredAuthentications=publickey,password
+    -o "PreferredAuthentications=$auth_mode"
+    -o StrictHostKeyChecking=accept-new
+    -o BatchMode=yes
     -o "ConnectTimeout=$timeout"
     "$user@$server"
     "exit 0"

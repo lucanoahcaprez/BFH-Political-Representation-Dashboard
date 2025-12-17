@@ -280,21 +280,33 @@ $portInput = Read-Value -Message 'SSH port' -Default '22'
 $port = [int]$portInput
 $user = Read-Value -Message 'SSH user'
 
-# 3) Ensure keypair locally and install pubkey remotely (one-time password)
-Write-Info "Ensure local sshkey is present"
-$pubKeyPath = Test-LocalSshKey
-Write-Info "Try to install public-key on $sshhost"
-Install-PublicKeyRemote -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -PublicKeyPath $pubKeyPath
+# 3) Try SSH with an existing key first; only install/generate on fallback.
+$defaultKeyPath = Join-Path $HOME '.ssh\id_ed25519'
+$pubKeyPath = "$defaultKeyPath.pub"
+$hasLocalKey = Test-Path $defaultKeyPath
+$connectedWithKey = $false
 
-
-# 4) Test SSH connectivity (should use key now)
-Write-Info 'Testing ssh connection with key'
-if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds)) {
-  Write-Error 'SSH connection failed after key install. Aborting.'
-  exit 1
+if ($hasLocalKey) {
+  Write-Info "Testing ssh connection with existing key at $defaultKeyPath"
+  $connectedWithKey = Test-SshConnection -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -PublicKeyOnly
 }
 
-Write-Success 'SSH connection with key OK.'
+if (-not $connectedWithKey) {
+  Write-Info 'SSH key authentication not available; falling back to password to install key.'
+  Write-Info "Ensure local sshkey is present"
+  $pubKeyPath = Test-LocalSshKey
+  Write-Info "Try to install public-key on $sshhost"
+  Install-PublicKeyRemote -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -PublicKeyPath $pubKeyPath
+
+  Write-Info 'Testing ssh connection with key after install'
+  if (-not (Test-SshConnection -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -PublicKeyOnly)) {
+    Write-Error 'SSH connection failed after key install. Aborting.'
+    exit 1
+  }
+  Write-Success 'SSH connection with key OK.'
+} else {
+  Write-Success 'SSH connection with existing key OK.'
+}
 
 # 5) Copy all necesarry remote task scripts
 Write-Info "Create remote task directory ($remoteTasksDir)"
