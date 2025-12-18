@@ -154,7 +154,8 @@ read_choice() {
         return 0
       fi
     done
-    log_warn "Invalid choice. Allowed: $display"
+    # Send warnings to stderr so command substitutions do not capture them.
+    log_warn "Invalid choice. Allowed: $display" >&2
   done
 }
 

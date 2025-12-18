@@ -335,7 +335,7 @@ if (-not $connectedWithKey) {
 }
 
 # 5) Copy all necesarry remote task scripts
-Write-Info "Create remote task directory ($remoteTasksDir)"
+Write-Info "Creating remote task directory ($remoteTasksDir)"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script "mkdir -p '$remoteTasksDir'"
 Write-Info "Copy remote tasks to $remoteTasksDir"
 Initialize-RemoteTaskScripts -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir
@@ -361,12 +361,14 @@ if (-not $isRootUser) {
 
 # 7) Prompt for remote directory and optional shutdown
 Write-Section "Remote target"
-$remoteDir = Read-Value -Message 'Remote deploy directory (created if missing)' -Default '/opt/political-dashboard'
+Write-Info "Choose remote deploy directory. Thats where your web application files will live. We create the directory for you if it is missing."
+$remoteDir = Read-Value -Message 'Remote deploy directory' -Default '/opt/political-dashboard'
 
 Write-Info "Prepare remote helper directory $remoteTasksDir"
 
 # 8) Check if user wants to shutdown existing docker stack
 if ($Shutdown) {
+  Write-Section "Shutdown"
   Write-Info "Checking for existing docker-compose files in $remoteDir"
   $hasCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
   
@@ -384,8 +386,11 @@ if ($Shutdown) {
 
 
 # 9) Create/update local .env.deploy
-Write-Info 'Step: Create or confirm deployment environment values (.env.deploy)'
-Write-Info 'Action: confirm defaults or customize ports/app domain used by docker-compose.'
+Write-Section "Environment file"
+Write-Info "In docker-compose, an environment file centralizes configuration like ports, domains, and credentials so containers stay configurable without editing compose YAML."
+Write-Info "We will create .env.deploy locally and copy it alongside the application files on the remote host so the stack reads consistent settings."
+Write-Info "Step: Create or confirm deployment environment values (.env.deploy)"
+Write-Info "Action: confirm defaults or customize ports/app domain used by docker-compose."
 $useEnvDefaults = Confirm-Action -Message 'Use default environment values (ports 8080/3000/5432, postgres user)?'
 $createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
 $envFile = & $createEnv -UseDefaults:$useEnvDefaults
@@ -405,7 +410,9 @@ $method = "local"
 $hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
 
 if ($hasExistingCompose) {
-  $action = Read-Choice -Message "Existing docker-compose found in $remoteDir. [redeploy|cancel]" -Options @('redeploy', 'cancel')
+  Write-Section "Existing deployment found"
+  Write-Info "We found an already existing docker stack in $remoteDir. You can choose if you want to redeploy with the current files or cancel the deployment"
+  $action = Read-Choice -Message "Type 'redeploy' or 'cancel'" -Options @('redeploy', 'cancel')
   if ($action -eq 'cancel') {
     Write-Warn 'Deployment cancelled by user.'
     exit 0
@@ -414,7 +421,7 @@ if ($hasExistingCompose) {
 
 # 11) Prepare remote host
 Write-Section "Prepare remote host"
-Write-Info 'Prepare remote host'
+Write-Info 'Installing prerequisites (docker, docker-compose, curl, git) if necessary'
 $sudoPasswordPlain = ConvertFrom-SecureStringPlainText -SecureText $sudoPassword
 
 $prepEnvAssignments = @("REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'")
@@ -460,15 +467,17 @@ if (-not $isRootUser) {
 $deployEnvAssignments = $deployEnvAssignments -join ' '
 
 $deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh' > /dev/null 2>&1"
+Write-Info "Deploy docker stack on remote machine in $remoteDir"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $deployCmd
 Write-Success 'Remote deploy executed.'
 
 # 14) Surface useful info to the user
+Write-Section "Summary"
 $remoteLogDir = '/var/log/political-dashboard'
 $appUrl = Get-AppUrl -EnvValues $envValues -Server $sshhost
 
-Write-Success @"
-Summary:
+Write-Info @"
+
   Project files  : $sshhost`:$remoteDir
   Remote logs    : $sshhost`:$remoteLogDir/prepare_remote.log and deploy.log
   Local log file : $logFile

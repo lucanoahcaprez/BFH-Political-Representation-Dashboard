@@ -35,7 +35,7 @@ prompt_required() {
   while [ -z "$value" ]; do
     value="$(read_value "$message" "$default")"
     if [ -z "$value" ]; then
-      log_warn "Please enter a value."
+      log_warn "Please enter a value." >&2
     fi
   done
   printf '%s' "$value"
@@ -207,11 +207,13 @@ else
 fi
 # 7) Prompt for remote directory and optional shutdown
 section "Remote target"
+log_info "Choose remote deploy directory. Thats where your web application files will live. We create the directory for you if it is missing."
 remote_dir="$(read_value "Remote deploy directory (created if missing)" "/opt/political-dashboard")"
 log_info "Prepare remote helper directory $REMOTE_TASKS_DIR"
 
 # 8) Check if user wants to shutdown existing docker stack
 if [ "$SHUTDOWN" = true ]; then
+  section "Shutdown"
   log_info "Checking for existing docker-compose files in $remote_dir"
   if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME"; then
     log_info "Stopping existing docker-compose stack in $remote_dir"
@@ -225,6 +227,9 @@ if [ "$SHUTDOWN" = true ]; then
 fi
 
 # 9) Create/update local .env.deploy
+section "Environment file"
+log_info "In docker-compose, an environment file centralizes configuration like ports, domains, and credentials so containers stay configurable without editing compose YAML."
+log_info "We will create .env.deploy locally and copy it alongside the application files on the remote host so the stack reads consistent settings."
 log_info "Step: Create or confirm deployment environment values (.env.deploy)"
 log_info "Action: confirm defaults or customize ports/app domain used by docker-compose."
 use_env_defaults=false
@@ -254,7 +259,9 @@ if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIM
 fi
 
 if [ "$has_existing_compose" = true ]; then
-  action="$(read_choice "Existing docker-compose found in $remote_dir. [redeploy|cancel]" "redeploy" "cancel")"
+  section "Existing deployment found"
+  log_info "We found an already existing docker stack in $remote_dir. You can choose if you want to redeploy with the current files or cancel the deployment"
+  action="$(read_choice "Type 'redeploy' or 'cancel'" "redeploy" "cancel")"
   if [ "$action" = "cancel" ]; then
     log_warn "Deployment cancelled by user."
     exit 0
@@ -263,7 +270,7 @@ fi
 
 # 11) Prepare remote host
 section "Prepare remote host"
-log_info "Prepare remote host"
+log_info "Installing prerequisites (docker, docker-compose, curl, git) if necessary"
 prep_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
 if [ "$is_root_user" = false ]; then
   prep_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
@@ -284,15 +291,17 @@ if [ "$is_root_user" = false ]; then
   deploy_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
 fi
 deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${deploy_cmd_env[*]} bash 'deploy.sh' > /dev/null 2>&1"
+log_info "Deploy docker stack on remote machine in $remote_dir"
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$deploy_cmd"
 log_success "Remote deploy executed."
 
 # 14) Surface useful info to the user
+section "Summary"
 remote_log_dir="/var/log/political-dashboard"
 app_url="$(get_app_url "$env_deploy_path" "8080" "$ssh_host")"
 
-log_success "$(cat <<EOF
-Summary:
+log_info "$(cat <<EOF
+
   Project files  : $ssh_host:$remote_dir
   Remote logs    : $ssh_host:$remote_log_dir/prepare_remote.log and deploy.log
   Local log file : $LOG_FILE
