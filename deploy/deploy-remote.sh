@@ -9,8 +9,6 @@ source "$SCRIPT_DIR/lib/ssh.sh"
 
 SHUTDOWN=false
 CONNECT_TIMEOUT_SECONDS=20
-CONNECT_DELAY_SECONDS=1
-
 print_deploy_header() {
   local divider="===================================================================="
   cat <<EOF
@@ -19,7 +17,7 @@ $divider
   Authors : Elia Bucher, Luca Noah Caprez, Pascal Feller (BFH student project)
   License : MIT (see LICENSE)
   Logs    : $SCRIPT_DIR/logs (per-run file announced below)
-  Usage   : $(basename "$0") [--shutdown] [--connect-timeout SECONDS] [--connect-delay SECONDS]
+  Usage   : $(basename "$0") [--shutdown] [--connect-timeout SECONDS]
             --shutdown stops the existing remote docker-compose stack, then exits.
   Steps   :
     1) Check local SSH/scp prerequisites and reachability
@@ -43,6 +41,12 @@ prompt_required() {
   printf '%s' "$value"
 }
 
+print_usage() {
+  cat <<EOF
+Usage: $(basename "$0") [--shutdown] [--connect-timeout SECONDS] [--connect-delay SECONDS]
+EOF
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --shutdown)
@@ -53,19 +57,14 @@ while [ $# -gt 0 ]; do
       CONNECT_TIMEOUT_SECONDS="${2:-20}"
       shift 2
       ;;
-    --connect-delay)
-      CONNECT_DELAY_SECONDS="${2:-1}"
-      shift 2
-      ;;
     -h|--help)
-      cat <<EOF
-Usage: $(basename "$0") [--shutdown] [--connect-timeout SECONDS] [--connect-delay SECONDS]
-EOF
+      print_usage
       exit 0
       ;;
     *)
-      log_warn "Ignoring unknown argument: $1"
-      shift
+      log_warn "Unknown argument: $1"
+      print_usage
+      exit 0
       ;;
   esac
 done

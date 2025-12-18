@@ -1,8 +1,7 @@
 [CmdletBinding()]
 param(
   [switch]$Shutdown,
-  [int]$ConnectTimeoutSeconds = 20,
-  [int]$ConnectDelaySeconds = 1
+  [int]$ConnectTimeoutSeconds = 20
 )
 
 Set-StrictMode -Version Latest
@@ -12,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\ssh.ps1')
 . (Join-Path $PSScriptRoot 'lib\ui.ps1')
 
-function Print-DeployHeader {
+function Write-DeployHeader {
   param(
     [string]$LogDir
   )
@@ -24,7 +23,7 @@ $divider
   Authors : Elia Bucher, Luca Noah Caprez, Pascal Feller (BFH student project)
   License : MIT (see LICENSE)
   Logs    : $LogDir (per-run file announced below)
-  Usage   : .\$scriptName [-Shutdown] [-ConnectTimeoutSeconds <int>] [-ConnectDelaySeconds <int>]
+  Usage   : .\$scriptName [-Shutdown] [-ConnectTimeoutSeconds <int>]
             -Shutdown stops the existing remote docker-compose stack, then exits.
   Steps   :
     1) Check local SSH/scp prerequisites and reachability
@@ -39,7 +38,7 @@ $logDir = Join-Path $PSScriptRoot 'logs'
 if (-not (Test-Path $logDir)) {
   New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 }
-$null = Print-DeployHeader -LogDir $logDir
+$null = Write-DeployHeader -LogDir $logDir
 Write-Info 'Starting remote deployment script.'
 $logFile = Join-Path $logDir ("deploy-remote-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 Set-UiLogFile -Path $logFile
