@@ -276,7 +276,6 @@ log_success "Remote preparation complete."
 
 # 12) Sync project using selected strategy
 section "Sync and deploy"
-log_info "Syncing project files to ${ssh_host}:${remote_dir} (quiet; details in $LOG_FILE)"
 invoke_deployment_sync "$method" "$ssh_user" "$ssh_host" "$ssh_port" "$remote_dir" "$SCRIPT_DIR" "$env_deploy_path"
 log_success "Sync via '$method' completed."
 
@@ -293,6 +292,12 @@ log_success "Remote deploy executed."
 remote_log_dir="/var/log/political-dashboard"
 app_url="$(get_app_url "$env_deploy_path" "8080" "$ssh_host")"
 
-log_success "Local log file: $LOG_FILE"
-log_success "Remote logs: $remote_log_dir/prepare_remote.log, $remote_log_dir/deploy.log (host: $ssh_host)"
-log_success "Application URL: $app_url"
+log_success "$(cat <<EOF
+Summary:
+  Project files  : $ssh_host:$remote_dir
+  Remote logs    : $ssh_host:$remote_log_dir/prepare_remote.log and deploy.log
+  Local log file : $LOG_FILE
+  Application    : $app_url
+Rerun this script anytime; use --shutdown to stop and remove the remote docker-compose stack.
+EOF
+)"

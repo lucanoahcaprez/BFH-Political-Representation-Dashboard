@@ -66,6 +66,8 @@ function Invoke-SyncStrategy {
   # Prepare staging directory to exclude node_modules before copying.
   $staging = Join-Path ([System.IO.Path]::GetTempPath()) ("deploy-sync-" + [guid]::NewGuid())
   New-Item -ItemType Directory -Path $staging | Out-Null
+  
+  Write-Info "Syncing project files to $($Context.Server)`:$remoteDir (quiet; details in $logFile)"
 
   try {
     function Copy-WithExcludeNodeModules {

@@ -73,6 +73,7 @@ invoke_sync_strategy() {
   local staging=""
   staging="$(mktemp -d)"
   trap 'tmp="${staging:-}"; [ -n "$tmp" ] && rm -rf "$tmp"' RETURN
+  log_info "Syncing project files to ${ssh_host}:${remote_dir} (quiet; details in $LOG_FILE)"
 
   copy_with_exclude_node_modules "$local_root/backend" "$staging/backend"
   copy_with_exclude_node_modules "$local_root/frontend" "$staging/frontend"

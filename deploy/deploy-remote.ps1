@@ -436,8 +436,7 @@ Write-Success 'Remote preparation complete.'
 
 # 12) Sync project using selected strategy
 Write-Section "Sync and deploy"
-$syncTargetLabel = "$sshhost`:$remoteDir"
-Write-Info "Syncing project files to $syncTargetLabel (quiet; details in $logFile)"
+
 $syncContext = @{
   Method     = $method
   User       = $user
@@ -469,6 +468,11 @@ Write-Success 'Remote deploy executed.'
 $remoteLogDir = '/var/log/political-dashboard'
 $appUrl = Get-AppUrl -EnvValues $envValues -Server $sshhost
 
-Write-Success "Local log file: $logFile"
-Write-Success "Remote logs: $remoteLogDir/prepare_remote.log, $remoteLogDir/deploy.log (host: $sshhost)"
-Write-Success "Application URL: $appUrl"
+Write-Success @"
+Summary:
+  Project files  : $sshhost`:$remoteDir
+  Remote logs    : $sshhost`:$remoteLogDir/prepare_remote.log and deploy.log
+  Local log file : $logFile
+  Application    : $appUrl
+Rerun this script anytime; use -Shutdown to stop and remove the remote docker-compose stack.
+"@
