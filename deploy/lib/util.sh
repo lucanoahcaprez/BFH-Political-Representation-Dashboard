@@ -42,8 +42,17 @@ ensure_local_ssh_key() {
 
   mkdir -p "$key_dir"
   if [ ! -f "$key_path" ] || [ ! -f "$pub_path" ]; then
-    log_info "Generating SSH key at $key_path"
-    ssh-keygen -t ed25519 -N '' -f "$key_path" >/dev/null
+    if command -v log_info >/dev/null 2>&1; then
+      log_info "Generating SSH key at $key_path" >&2
+    else
+      printf '%s\n' "Generating SSH key at $key_path" >&2
+    fi
+    if ! ssh-keygen -t ed25519 -N '' -f "$key_path" >/dev/null; then
+      new_error "failed to generate SSH key at $key_path"
+    fi
+  fi
+  if [ ! -f "$pub_path" ]; then
+    new_error "SSH public key missing at $pub_path (generation failed?)"
   fi
   printf '%s' "$pub_path"
 }
