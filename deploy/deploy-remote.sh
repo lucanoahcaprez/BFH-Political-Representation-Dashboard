@@ -270,13 +270,12 @@ fi
 
 # 11) Prepare remote host
 section "Prepare remote host"
-log_info "Installing prerequisites (docker, docker-compose, curl, git) if necessary"
+log_info "Installing prerequisites (docker, docker-compose, curl, git) if necessary. This may take up to 2 minutes. Please wait..."
 prep_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
 if [ "$is_root_user" = false ]; then
   prep_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
 fi
 prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && ${prep_cmd_env[*]} bash 'prepare_remote.sh' > /dev/null 2>&1"
-log_info "Prepare remote: running prepare_remote.sh quietly (details in $LOG_FILE)"
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$prep_cmd"
 log_success "Remote preparation complete."
 
@@ -291,7 +290,7 @@ if [ "$is_root_user" = false ]; then
   deploy_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
 fi
 deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${deploy_cmd_env[*]} bash 'deploy.sh' > /dev/null 2>&1"
-log_info "Deploy docker stack on remote machine in $remote_dir"
+log_info "Deploy docker stack on remote machine in $remote_dir. This may take 2-3 minutes while containers build/start. Please wait..."
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$deploy_cmd"
 log_success "Remote deploy executed."
 
