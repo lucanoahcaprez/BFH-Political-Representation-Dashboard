@@ -39,12 +39,30 @@ function Read-EnvDeployValues {
   return $result
 }
 
-# ensure local ssh key
-function Test-LocalSshKey {
-  $keyPath = Join-Path $HOME '.ssh\id_ed25519'
-  if (-not (Test-Path $keyPath)) {
-    Write-Host "Generating SSH key at $keyPath"
-    ssh-keygen -t ed25519 -N '' -f $keyPath | Out-Null
+# Returns the default local SSH key paths and whether the private key exists.
+function Get-LocalSshKeyInfo {
+  $privatePath = Join-Path $HOME '.ssh\id_ed25519'
+  $publicPath = "$privatePath.pub"
+  $exists = Test-Path $privatePath
+  return [PSCustomObject]@{
+    PrivatePath = $privatePath
+    PublicPath  = $publicPath
+    Exists      = $exists
   }
-  return "$keyPath.pub"
+}
+
+# Ensure local ssh key exists and return details (including whether it was generated).
+function Test-LocalSshKey {
+  $info = Get-LocalSshKeyInfo
+  $generated = $false
+  if (-not $info.Exists) {
+    Write-Host "Generating SSH key at $($info.PrivatePath)"
+    ssh-keygen -t ed25519 -N '' -f $info.PrivatePath | Out-Null
+    $generated = $true
+    $info = Get-LocalSshKeyInfo
+  }
+
+  # Augment with a Generated flag for callers that care.
+  $info | Add-Member -NotePropertyName Generated -NotePropertyValue $generated -Force
+  return $info
 }

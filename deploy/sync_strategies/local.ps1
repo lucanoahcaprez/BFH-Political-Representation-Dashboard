@@ -66,6 +66,8 @@ function Invoke-SyncStrategy {
   # Prepare staging directory to exclude node_modules before copying.
   $staging = Join-Path ([System.IO.Path]::GetTempPath()) ("deploy-sync-" + [guid]::NewGuid())
   New-Item -ItemType Directory -Path $staging | Out-Null
+  
+  Write-Info "Syncing project files to $($Context.Server)`:$remoteDir (quiet; details in $logFile)"
 
   try {
     function Copy-WithExcludeNodeModules {
@@ -76,7 +78,13 @@ function Invoke-SyncStrategy {
 
       # TODO: Explain why we used robocopy
       New-Item -ItemType Directory -Path $Destination -Force | Out-Null
-      $arguments = @($Source, $Destination, '/MIR', '/XD', 'node_modules')
+      $arguments = @(
+        $Source,
+        $Destination,
+        '/MIR',
+        '/XD', 'node_modules',
+        '/NFL', '/NDL', '/NJH', '/NJS', '/NP'
+      )
       $proc = Start-Process -FilePath 'robocopy' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
       # Robocopy exit codes: 0-7 are success/acceptable, >7 indicate failure.
       if ($proc.ExitCode -gt 7) {
@@ -90,12 +98,13 @@ function Invoke-SyncStrategy {
     Copy-Item -Path (Join-Path $localRoot 'docker-compose.prod.yml') -Destination $staging -Force
     Copy-Item -Path $Context.EnvFile -Destination $staging -Force
 
-    $destination = "$sshTarget`:$remoteDir/"
-    $scpArgs = @(
-      '-P', $Context.Port,
-      '-o', 'StrictHostKeyChecking=accept-new',
-      '-r',
-      (Join-Path $staging 'backend'),
+  $destination = "$sshTarget`:$remoteDir/"
+  $scpArgs = @(
+    '-P', $Context.Port,
+    '-q',
+    '-o', 'StrictHostKeyChecking=accept-new',
+    '-r',
+    (Join-Path $staging 'backend'),
       (Join-Path $staging 'frontend'),
       (Join-Path $staging 'docker-compose.yml'),
       (Join-Path $staging 'docker-compose.prod.yml'),

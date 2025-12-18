@@ -14,6 +14,7 @@ REMOTE_GROUP="$(id -gn)"
 
 SUDO_CMD=""
 
+# TODO: FIX sorry, wrong password even if correct
 # Sudo handling (same pattern as prepare_remote.sh)
 if [ "$(id -u)" -eq 0 ]; then
     SUDO_CMD=""
