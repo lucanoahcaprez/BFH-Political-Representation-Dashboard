@@ -4,6 +4,8 @@ stages:
   - mirror-github
 
 mirror_github:
+  variables:
+    GIT_DEPTH: "0"
   stage: mirror-github
   image:
     name: alpine/git:latest
