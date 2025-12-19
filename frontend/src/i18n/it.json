@@ -26,14 +26,12 @@
     "tooltip": "R(V, A) deriva dal confronto tra A(V) (raccomandazione) e S(V) (decisione popolare).",
     "formulaExplanation": "A(V) è la raccomandazione dell’attore A (ad es. Consiglio federale, Parlamento, partito) sulla proposta V, e S(V) è il verdetto del popolo."
   },
-
   "formulaValues": {
     "plusOne": " → La raccomandazione corrisponde alla decisione popolare.",
     "zero": " → L’attore si è astenuto (nessuna raccomandazione).",
     "minusOne": " → La raccomandazione contraddice la decisione popolare.",
     "if": "se"
   },
-
   "home": {
     "diagram1Title": "Raccomandazioni del Consiglio federale/Parlamento rispetto al referendum",
     "diagram2Title": "Rappresentatività dei partiti nel tempo",
@@ -179,12 +177,12 @@
   "footer": {
     "dataSource": "Fonte dei dati:",
     "projectInfo": "Questa dashboard è stata sviluppata nell'ambito di un progetto di studio presso la Scuola universitaria professionale di Berna (BFH).",
-    "authors": "Autori: ",
+    "authorsv1": "Autori Versione 1.0: ",
+    "authorsv2": "Autori Versione 2.0: ",
     "supervisor": "Supervisore: ",
     "license": "Tutto il codice sorgente è concesso in licenza",
     "lastUpdate": "Ultimo aggiornamento del database",
-    "loading": "caricamento..."
+    "loading": "caricamento...",
+    "validatorsTitle": "Verifiche di validazione e sicurezza:"
   }
 }
-
-

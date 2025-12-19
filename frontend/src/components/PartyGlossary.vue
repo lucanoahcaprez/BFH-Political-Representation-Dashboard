@@ -1,6 +1,6 @@
 <template>
+        <h2>{{ $t('common.partyGlossary') }}</h2>
   <div class="party-glossary">
-    <h4>{{ $t('common.partyGlossary') }}</h4>
     <ul>
       <li v-for="party in partyKeys" :key="party">
         <strong>{{ $t(`parties.${party}.short`) }}</strong>:
@@ -24,7 +24,7 @@ const partyKeys = [
 .party-glossary {
   background: #f9f9f9;
   padding: 1rem;
-  margin-top: 2rem;
+  margin-top: 1rem;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;

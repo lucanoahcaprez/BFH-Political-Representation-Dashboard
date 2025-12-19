@@ -29,9 +29,11 @@
     <section class="full">
       <KantonaleRepraesentationChart />
     </section>
+    <section class="full">
+  <PartyGlossary />
+    </section>
   </div>
 
-  <PartyGlossary />
 
   <div id="app">
     <Footer />

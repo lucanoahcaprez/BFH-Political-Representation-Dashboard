@@ -18,7 +18,6 @@
     "year": "Année",
     "Abstimmungstag": "Jour de vote",
     "Vorlage": "Proposition"
-
   },
   "intro": {
     "projectTitle": "Tableau de représentation politique",
@@ -27,15 +26,12 @@
     "tooltip": "R(V, A) résulte de la comparaison entre A(V) (recommandation) et S(V) (décision populaire).",
     "formulaExplanation": "A(V) est la recommandation de l’acteur A (par ex. Conseil fédéral, Parlement, parti) sur la proposition V, et S(V) est le verdict du peuple."
   },
-
   "formulaValues": {
     "plusOne": " → La recommandation correspond à la décision populaire.",
     "zero": " → L’acteur s’est abstenu (pas de recommandation).",
     "minusOne": " → La recommandation contredit la décision populaire.",
     "if": "si"
   },
-
-
   "home": {
     "diagram1Title": "Recommandations du Conseil fédéral/Parlement par rapport à la décision du peuple",
     "diagram2Title": "Représentativité des partis dans le temps",
@@ -64,29 +60,91 @@
     "descriptionText": "Cette carte montre dans quelle mesure les recommandations de l'acteur choisi correspondent à la décision populaire dans les différents cantons.\n\nL'intensité de la couleur indique le niveau de concordance. Sélectionnez en haut Conseil fédéral ou un parti.",
     "tooltipLabel": "Concordance"
   },
-
   "parties": {
-    "fdp": { "short": "PLR", "full": "PLR.Les Libéraux-Radicaux" },
-    "sps": { "short": "PSS", "full": "Parti socialiste suisse" },
-    "svp": { "short": "UDC", "full": "Union démocratique du centre" },
-    "mitte": { "short": "Le Centre", "full": "Le Centre" },
-    "evp": { "short": "PEV", "full": "Parti évangélique suisse" },
-    "gps": { "short": "Les Verts", "full": "les VERT-E-S suisses" },
-    "glp": { "short": "PVL", "full": "Parti vert’libéral Suisse" },
-    "pda": { "short": "PsT", "full": "Parti suisse du Travail" },
-    "sd": { "short": "DS", "full": "Démocrates Suisses" },
-    "edu": { "short": "UDF", "full": "Union démocratique fédérale" },
-    "fps": { "short": "PLS", "full": "Parti libertaire suisse" },
-    "lega": { "short": "Lega", "full": "Ligue des Tessinois" },
-    "kvp": { "short": "PK", "full": "Parti catholique conservateur" },
-    "mcg": { "short": "MCG", "full": "Mouvement Citoyens Genevois" },
-    "ucsp": { "short": "PCS", "full": "Parti chrétien-social" },
-    "cvp": { "short": "PDC", "full": "Larti démocrate-chrétien" },
-    "bdp": { "short": "PBD", "full": "Parti bourgeois démocratique Suisse" },
-    "lps": { "short": "PLS", "full": "Parti libéral suisse" },
-    "ldu": { "short": "AdI", "full": "Alliance des Indépendants" },
-    "poch": { "short": "POCH", "full": "Organisations progressistes de Suisse" },
-    "rep": { "short": "REP", "full": "Mouvement national d’action républicaine" }
+    "fdp": {
+      "short": "PLR",
+      "full": "PLR.Les Libéraux-Radicaux"
+    },
+    "sps": {
+      "short": "PSS",
+      "full": "Parti socialiste suisse"
+    },
+    "svp": {
+      "short": "UDC",
+      "full": "Union démocratique du centre"
+    },
+    "mitte": {
+      "short": "Le Centre",
+      "full": "Le Centre"
+    },
+    "evp": {
+      "short": "PEV",
+      "full": "Parti évangélique suisse"
+    },
+    "gps": {
+      "short": "Les Verts",
+      "full": "les VERT-E-S suisses"
+    },
+    "glp": {
+      "short": "PVL",
+      "full": "Parti vert’libéral Suisse"
+    },
+    "pda": {
+      "short": "PsT",
+      "full": "Parti suisse du Travail"
+    },
+    "sd": {
+      "short": "DS",
+      "full": "Démocrates Suisses"
+    },
+    "edu": {
+      "short": "UDF",
+      "full": "Union démocratique fédérale"
+    },
+    "fps": {
+      "short": "PLS",
+      "full": "Parti libertaire suisse"
+    },
+    "lega": {
+      "short": "Lega",
+      "full": "Ligue des Tessinois"
+    },
+    "kvp": {
+      "short": "PK",
+      "full": "Parti catholique conservateur"
+    },
+    "mcg": {
+      "short": "MCG",
+      "full": "Mouvement Citoyens Genevois"
+    },
+    "ucsp": {
+      "short": "PCS",
+      "full": "Parti chrétien-social"
+    },
+    "cvp": {
+      "short": "PDC",
+      "full": "Larti démocrate-chrétien"
+    },
+    "bdp": {
+      "short": "PBD",
+      "full": "Parti bourgeois démocratique Suisse"
+    },
+    "lps": {
+      "short": "PLS",
+      "full": "Parti libéral suisse"
+    },
+    "ldu": {
+      "short": "AdI",
+      "full": "Alliance des Indépendants"
+    },
+    "poch": {
+      "short": "POCH",
+      "full": "Organisations progressistes de Suisse"
+    },
+    "rep": {
+      "short": "REP",
+      "full": "Mouvement national d’action républicaine"
+    }
   },
   "cantons": {
     "ZH": "Zurich",
@@ -119,13 +177,12 @@
   "footer": {
     "dataSource": "Source des données :",
     "projectInfo": "Ce tableau de bord a été développé dans le cadre d'un projet d'études à la Haute école spécialisée bernoise (BFH).",
-    "authors": "Auteurs : ",
+    "authorsv1": "Auteurs Version 1.0: ",
+    "authorsv2": "Auteurs Version 2.0: ",
     "supervisor": "Supervisé par : ",
     "license": "L'ensemble du code source est sous licence",
     "lastUpdate": "Dernière mise à jour de la base de données",
-    "loading": "chargement..."
+    "loading": "chargement...",
+    "validatorsTitle": "Validations et controles de securite:"
   }
-
 }
-
-
