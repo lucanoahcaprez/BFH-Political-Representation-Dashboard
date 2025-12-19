@@ -26,14 +26,12 @@
     "tooltip": "R(V, A) results from comparing A(V) (recommendation) with S(V) (public decision).",
     "formulaExplanation": "A(V) is the recommendation of actor A (e.g. Federal Council, Parliament, party) on proposal V, and S(V) is the verdict of the public."
   },
-
   "formulaValues": {
     "plusOne": " → Recommendation matches public decision.",
     "zero": " → The actor abstained (no recommendation).",
     "minusOne": " → Recommendation contradicts public decision.",
     "if": "if"
   },
-
   "home": {
     "diagram1Title": "Recommendations by Federal Council/Parliament vs Public Decision",
     "diagram2Title": "Party Representation Over Time",
@@ -63,27 +61,90 @@
     "tooltipLabel": "Agreement"
   },
   "parties": {
-    "fdp": { "short": "FDP", "full": "The Liberals" },
-    "sps": { "short": "SPS", "full": "Social Democratic Party of Switzerland" },
-    "svp": { "short": "SVP", "full": "Swiss People's Party" },
-    "mitte": { "short": "The Centre", "full": "The Centre (Die Mitte)" },
-    "evp": { "short": "EVP", "full": "Evangelical People's Party of Switzerland" },
-    "gps": { "short": "Greens", "full": "Green Party of Switzerland" },
-    "glp": { "short": "GLP", "full": "Green Liberal Party of Switzerland" },
-    "pda": { "short": "PdA", "full": "Swiss Party of Labour" },
-    "sd": { "short": "SD", "full": "Swiss Democrats" },
-    "edu": { "short": "EDU", "full": "Federal Democratic Union of Switzerland" },
-    "fps": { "short": "FPS", "full": "Freedom Party of Switzerland (Auto Party)" },
-    "lega": { "short": "Lega", "full": "Ticino League" },
-    "kvp": { "short": "KVP", "full": "Catholic People's Party" },
-    "mcg": { "short": "MCG", "full": "Geneva Citizens' Movement" },
-    "ucsp": { "short": "CSP", "full": "Christian Social Party of Switzerland" },
-    "cvp": { "short": "CVP", "full": "Christian Democratic People's Party of Switzerland" },
-    "bdp": { "short": "BDP", "full": "Conservative Democratic Party" },
-    "lps": { "short": "LPS", "full": "Liberal Party of Switzerland" },
-    "ldu": { "short": "LDU", "full": "Alliance of Independents" },
-    "poch": { "short": "POCH", "full": "Progressive Organizations of Switzerland" },
-    "rep": { "short": "REP", "full": "Republican Movement" }
+    "fdp": {
+      "short": "FDP",
+      "full": "The Liberals"
+    },
+    "sps": {
+      "short": "SPS",
+      "full": "Social Democratic Party of Switzerland"
+    },
+    "svp": {
+      "short": "SVP",
+      "full": "Swiss People's Party"
+    },
+    "mitte": {
+      "short": "The Centre",
+      "full": "The Centre (Die Mitte)"
+    },
+    "evp": {
+      "short": "EVP",
+      "full": "Evangelical People's Party of Switzerland"
+    },
+    "gps": {
+      "short": "Greens",
+      "full": "Green Party of Switzerland"
+    },
+    "glp": {
+      "short": "GLP",
+      "full": "Green Liberal Party of Switzerland"
+    },
+    "pda": {
+      "short": "PdA",
+      "full": "Swiss Party of Labour"
+    },
+    "sd": {
+      "short": "SD",
+      "full": "Swiss Democrats"
+    },
+    "edu": {
+      "short": "EDU",
+      "full": "Federal Democratic Union of Switzerland"
+    },
+    "fps": {
+      "short": "FPS",
+      "full": "Freedom Party of Switzerland (Auto Party)"
+    },
+    "lega": {
+      "short": "Lega",
+      "full": "Ticino League"
+    },
+    "kvp": {
+      "short": "KVP",
+      "full": "Catholic People's Party"
+    },
+    "mcg": {
+      "short": "MCG",
+      "full": "Geneva Citizens' Movement"
+    },
+    "ucsp": {
+      "short": "CSP",
+      "full": "Christian Social Party of Switzerland"
+    },
+    "cvp": {
+      "short": "CVP",
+      "full": "Christian Democratic People's Party of Switzerland"
+    },
+    "bdp": {
+      "short": "BDP",
+      "full": "Conservative Democratic Party"
+    },
+    "lps": {
+      "short": "LPS",
+      "full": "Liberal Party of Switzerland"
+    },
+    "ldu": {
+      "short": "LDU",
+      "full": "Alliance of Independents"
+    },
+    "poch": {
+      "short": "POCH",
+      "full": "Progressive Organizations of Switzerland"
+    },
+    "rep": {
+      "short": "REP",
+      "full": "Republican Movement"
+    }
   },
   "cantons": {
     "ZH": "Zurich",
@@ -116,11 +177,12 @@
   "footer": {
     "dataSource": "Data source:",
     "projectInfo": "This dashboard was developed as part of a student project at Bern University of Applied Sciences (BFH).",
-    "authors": "Authors: ",
+    "authorsv1": "Authors Version 1.0: ",
+    "authorsv2": "Authors Version 2.0: ",
     "supervisor": "Supervised by: ",
     "license": "The entire source code is licensed under the",
     "lastUpdate": "Last database update",
-    "loading": "loading..."
+    "loading": "loading...",
+    "validatorsTitle": "Validation and security checks:"
   }
-
 }

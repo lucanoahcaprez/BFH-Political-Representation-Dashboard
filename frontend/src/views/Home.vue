@@ -18,7 +18,7 @@
     </section>
 
     <section class="full">
-      <ParteiRepräsentationChart />
+      <ParteiRepraesentationChart />
     </section>
 
     <!-- Row 2: Diagramm 3 + 4 -->
@@ -27,11 +27,13 @@
     </section>
 
     <section class="full">
-      <KantonaleRepräsentationChart />
+      <KantonaleRepraesentationChart />
+    </section>
+    <section class="full">
+  <PartyGlossary />
     </section>
   </div>
 
-  <PartyGlossary />
 
   <div id="app">
     <Footer />
@@ -44,9 +46,9 @@
 <script setup>
 import { useI18n } from 'vue-i18n'
 import EmpfehlungenVolkChart from '@/components/D1_StackedBarChart/EmpfehlungenVolkChart.vue'
-import ParteiRepräsentationChart from '@/components/D2_LineChart/ParteiRepräsentationChart.vue'
+import ParteiRepraesentationChart from '@/components/D2_LineChart/ParteiRepraesentationChart.vue'
 import PoliticalInstitutionsVolk from '@/components/D3_HeatMap/PoliticalInstitutionsVolk.vue'
-import KantonaleRepräsentationChart from '@/components/D4_ChoroplethMap/KantonaleRepräsentationChart.vue'
+import KantonaleRepraesentationChart from '@/components/D4_ChoroplethMap/KantonaleRepraesentationChart.vue'
 import PartyGlossary from '@/components/PartyGlossary.vue'
 import Footer from "@/components/Footer.vue";
 import ProjectIntro from "@/components/ProjectIntro.vue";

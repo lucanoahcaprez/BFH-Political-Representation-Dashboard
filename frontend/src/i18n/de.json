@@ -26,14 +26,12 @@
     "tooltip": "R(V, A) ergibt sich durch den Vergleich von A(V) (Empfehlung) mit S(V) (Volksentscheid).",
     "formulaExplanation": "A(V) ist die Empfehlung des Akteurs A (z. B. Bundesrat, Parlament, Partei) zur Vorlage V, und S(V) das Verdikt des Volkes."
   },
-
   "formulaValues": {
     "plusOne": " → Empfehlung entspricht dem Volksentscheid.",
     "zero": " → Der Akteur hat sich enthalten.",
     "minusOne": " → Empfehlung widerspricht dem Volksentscheid.",
     "if": "wenn"
   },
-
   "home": {
     "diagram1Title": "Empfehlungen von Bundesrat/Parlament im Vergleich zum Volksentscheid",
     "diagram2Title": "Partei-Repräsentativität über Zeit",
@@ -62,29 +60,91 @@
     "descriptionText": "Diese Karte zeigt, wie oft die Empfehlungen des gewählten Akteurs mit dem Volksentscheid in den einzelnen Kantonen übereinstimmen.\n\nDie Farbstärke zeigt die Höhe der Übereinstimmung. Wählen Sie oben Bundesrat oder eine Partei.",
     "tooltipLabel": "Übereinstimmung"
   },
-
   "parties": {
-    "fdp": { "short": "FDP", "full": "FDP.Die Liberalen" },
-    "sps": { "short": "SPS", "full": "Sozialdemokratische Partei der Schweiz" },
-    "svp": { "short": "SVP", "full": "Schweizerische Volkspartei" },
-    "mitte": { "short": "Die Mitte", "full": "Die Mitte" },
-    "evp": { "short": "EVP", "full": "Evangelische Volkspartei der Schweiz" },
-    "gps": { "short": "Grüne", "full": "GRÜNE Schweiz" },
-    "glp": { "short": "GLP", "full": "Die Grünliberale Partei Schweiz" },
-    "pda": { "short": "PdA", "full": "Partei der Arbeit der Schweiz" },
-    "sd": { "short": "SD", "full": "Schweizer Demokraten" },
-    "edu": { "short": "EDU", "full": "Eidgenössisch-Demokratische Union" },
-    "fps": { "short": "FPS", "full": "Freiheitliche Partei der Schweiz (Auto-Partei)" },
-    "lega": { "short": "Lega", "full": "Liga der Tessiner" },
-    "kvp": { "short": "KVP", "full": "Katholische Volkspartei" },
-    "mcg": { "short": "MCG", "full": "Genfer Bürgerbewegung" },
-    "ucsp": { "short": "CSP", "full": "Christlichsoziale Partei der Schweiz" },
-    "cvp": { "short": "CVP", "full": "Christlichdemokratische Volkspartei der Schweiz" },
-    "bdp": { "short": "BDP", "full": "Bürgerlich-Demokratische Partei" },
-    "lps": { "short": "LPS", "full": "Liberale Partei der Schweiz" },
-    "ldu": { "short": "LDU", "full": "Landesring der Unabhängigen" },
-    "poch": { "short": "POCH", "full": "Progressive Organisationen der Schweiz" },
-    "rep": { "short": "REP", "full": "Movimento repubblicano" }
+    "fdp": {
+      "short": "FDP",
+      "full": "FDP.Die Liberalen"
+    },
+    "sps": {
+      "short": "SPS",
+      "full": "Sozialdemokratische Partei der Schweiz"
+    },
+    "svp": {
+      "short": "SVP",
+      "full": "Schweizerische Volkspartei"
+    },
+    "mitte": {
+      "short": "Die Mitte",
+      "full": "Die Mitte"
+    },
+    "evp": {
+      "short": "EVP",
+      "full": "Evangelische Volkspartei der Schweiz"
+    },
+    "gps": {
+      "short": "Grüne",
+      "full": "GRÜNE Schweiz"
+    },
+    "glp": {
+      "short": "GLP",
+      "full": "Die Grünliberale Partei Schweiz"
+    },
+    "pda": {
+      "short": "PdA",
+      "full": "Partei der Arbeit der Schweiz"
+    },
+    "sd": {
+      "short": "SD",
+      "full": "Schweizer Demokraten"
+    },
+    "edu": {
+      "short": "EDU",
+      "full": "Eidgenössisch-Demokratische Union"
+    },
+    "fps": {
+      "short": "FPS",
+      "full": "Freiheitliche Partei der Schweiz (Auto-Partei)"
+    },
+    "lega": {
+      "short": "Lega",
+      "full": "Liga der Tessiner"
+    },
+    "kvp": {
+      "short": "KVP",
+      "full": "Katholische Volkspartei"
+    },
+    "mcg": {
+      "short": "MCG",
+      "full": "Genfer Bürgerbewegung"
+    },
+    "ucsp": {
+      "short": "CSP",
+      "full": "Christlichsoziale Partei der Schweiz"
+    },
+    "cvp": {
+      "short": "CVP",
+      "full": "Christlichdemokratische Volkspartei der Schweiz"
+    },
+    "bdp": {
+      "short": "BDP",
+      "full": "Bürgerlich-Demokratische Partei"
+    },
+    "lps": {
+      "short": "LPS",
+      "full": "Liberale Partei der Schweiz"
+    },
+    "ldu": {
+      "short": "LDU",
+      "full": "Landesring der Unabhängigen"
+    },
+    "poch": {
+      "short": "POCH",
+      "full": "Progressive Organisationen der Schweiz"
+    },
+    "rep": {
+      "short": "REP",
+      "full": "Movimento repubblicano"
+    }
   },
   "cantons": {
     "ZH": "Zürich",
@@ -117,13 +177,12 @@
   "footer": {
     "dataSource": "Datenquelle:",
     "projectInfo": "Dieses Dashboard wurde im Rahmen eines Studienprojekts an der Berner Fachhochschule (BFH) entwickelt.",
-    "authors": "Autoren: ",
+    "authorsv1": "Autoren Version 1.0: ",
+    "authorsv2": "Autoren Version 2.0: ",
     "supervisor": "Betreut von: ",
     "license": "Der gesamte Quellcode steht unter der",
     "lastUpdate": "Letztes Datenbank-Update",
-    "loading": "lädt..."
+    "loading": "lädt...",
+    "validatorsTitle": "Validierung und Sicherheitschecks:"
   }
-
 }
-
-
