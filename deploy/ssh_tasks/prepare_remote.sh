@@ -127,30 +127,50 @@ ensure_docker() {
     fi
 }
 
+install_compose_binary() {
+  local version="${COMPOSE_VERSION:-v2.29.7}"
+  local arch
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64|amd64) arch="x86_64" ;;
+    aarch64|arm64) arch="aarch64" ;;
+    armv7l) arch="armv7" ;;
+    *) log "Unsupported architecture for Docker Compose: ${arch}" >&2; return 1 ;;
+  esac
+
+  local url="https://github.com/docker/compose/releases/download/${version}/docker-compose-Linux-${arch}"
+  local dest="/usr/lib/docker/cli-plugins/docker-compose"
+
+  log "Downloading Docker Compose plugin binary ${version} for ${arch}"
+  run_cmd mkdir -p /usr/lib/docker/cli-plugins
+  run_cmd curl -fL "$url" -o "$dest"
+  run_cmd chmod +x "$dest"
+}
+
 ensure_compose() {
-    if docker compose version >/dev/null 2>&1; then
-        return
-    fi
-    if command -v docker-compose >/dev/null 2>&1; then
-        return
-    fi
-    log "Installing Docker Compose plugin (fallback to legacy if unavailable)"
-    if ! apt_install docker-compose-plugin; then
-        apt_install docker-compose
-    fi
+  if docker compose version >/dev/null 2>&1; then
+    return
+  fi
+
+  log "Installing Docker Compose plugin"
+  if ! apt_install docker-compose-plugin; then
+    log "docker-compose-plugin package not found; attempting manual install" >&2
+    install_compose_binary
+  fi
+
+  if ! docker compose version >/dev/null 2>&1; then
+    log "Docker Compose plugin installation failed" >&2
+    exit 1
+  fi
 }
 
 detect_compose_cmd() {
-    if docker compose version >/dev/null 2>&1; then
-        echo "docker compose"
-        return
-    fi
-    if command -v docker-compose >/dev/null 2>&1; then
-        echo "docker-compose"
-        return
-    fi
-    log "Docker Compose is not available after attempted installation" >&2
+  if ! docker compose version >/dev/null 2>&1; then
+    log "Docker Compose plugin is not available after attempted installation" >&2
     exit 1
+  fi
+
+  echo "docker compose"
 }
 
 main() {
