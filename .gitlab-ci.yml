@@ -11,7 +11,7 @@ mirror_github:
   before_script: []
   script:
     - git remote remove github || true
-    - git remote add github https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/$GITHUB_USERNAME/Azure-Functions-Performance.git
+    - git remote add github https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/$GITHUB_USERNAME/BFH-Political-Representation-Dashboard.git
     - git fetch --prune --tags origin
     - git push --force github HEAD:main
     - git push --tags github
