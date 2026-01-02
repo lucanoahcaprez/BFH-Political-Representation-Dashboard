@@ -49,6 +49,7 @@ $remoteTasksDir = "/tmp/pol-dashboard-tasks"
 $checkScriptName = 'check_remote_compose.sh'
 $shutdownScriptName = 'shutdown_remote_compose.sh'
 $checkSudoScriptName = 'check_sudo.sh'
+$checkPortScriptName = 'check_port_available.sh'
 
 function ConvertTo-EscapedSingleQuote {
   param([Parameter(Mandatory = $true)][string]$Text)
@@ -194,6 +195,30 @@ function Test-RemoteComposePresent {
   return ($output -match 'present')
 }
 
+function Check-RemotePortAvailable {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
+    [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
+    [Parameter(Mandatory = $true)][string]$FrontendPort,
+    [Parameter(Mandatory = $true)][string]$CheckScriptName,
+    [System.Security.SecureString]$SudoPassword = $null
+  )
+
+  $envAssignments = @("REMOTE_PORT='$(ConvertTo-EscapedSingleQuote $FrontendPort)'")
+  if ($SudoPassword) {
+    $plainSudo = ConvertFrom-SecureStringPlainText -SecureText $SudoPassword
+    if ($plainSudo) {
+      $envAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $plainSudo)'"
+    }
+  }
+  $envPrefix = $envAssignments -join ' '
+  $cmd = "cd '$RemoteTasksDir' && chmod +x '$CheckScriptName' && $envPrefix bash '$CheckScriptName'"
+  return Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $cmd
+}
+
 function Stop-RemoteCompose {
   param(
     [Parameter(Mandatory = $true)][string]$User,
@@ -290,6 +315,89 @@ function Invoke-DeploymentSync {
   }
 
   Invoke-SyncStrategy -Context $Context
+}
+
+function Set-EnvValue {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Key,
+    [Parameter(Mandatory = $true)][string]$Value
+  )
+
+  $lines = @()
+  if (Test-Path $Path) {
+    $lines = Get-Content -Path $Path -ErrorAction SilentlyContinue
+  }
+
+  $updated = @()
+  $found = $false
+  foreach ($line in $lines) {
+    if ($line -like "$Key=*") {
+      $updated += "$Key=$Value"
+      $found = $true
+    } else {
+      $updated += $line
+    }
+  }
+
+  if (-not $found) {
+    $updated += "$Key=$Value"
+  }
+
+  Set-Content -Path $Path -Value $updated -Encoding UTF8
+}
+
+function Test-FrontendPortAvailable {
+  param(
+    [Parameter(Mandatory = $true)][string]$EnvPath,
+    [Parameter(Mandatory = $true)][bool]$HasExistingCompose,
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [Parameter(Mandatory = $true)][int]$Port,
+    [Parameter(Mandatory = $true)][int]$ConnectTimeoutSeconds,
+    [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
+    [Parameter(Mandatory = $true)][string]$CheckScriptName,
+    [System.Security.SecureString]$SudoPassword = $null
+  )
+
+  $envValues = Read-EnvDeployValues -Path $EnvPath
+  $frontendPort = if ($envValues.ContainsKey('FRONTEND_PORT') -and $envValues['FRONTEND_PORT']) { $envValues['FRONTEND_PORT'] } else { '8080' }
+
+  while ($true) {
+    $result = Check-RemotePortAvailable -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $RemoteTasksDir -FrontendPort $frontendPort -CheckScriptName $CheckScriptName -SudoPassword $SudoPassword
+
+    if ($result -match '^available') {
+      Write-Success "Frontend port $frontendPort is available on $Server."
+      return $frontendPort
+    }
+
+    if ($result -match '^error:') {
+      Write-Warn "Could not verify port availability on $Server (response: $result)."
+      $continue = Confirm-Action -Message "Continue with port $frontendPort anyway?"
+      if ($continue) { return $frontendPort }
+    } else {
+      $detail = $result -replace '^in_use:', ''
+      Write-Warn "Port $frontendPort is already in use on $Server."
+      if (-not [string]::IsNullOrWhiteSpace($detail)) {
+        Write-Info "Socket info: $detail"
+      }
+
+      if ($HasExistingCompose) {
+        $choice = Read-Choice -Message "Options: reuse (assume existing deployment), choose-new, cancel" -Options @('reuse','choose-new','cancel')
+        switch ($choice) {
+          'reuse' { Write-Info "Reusing port $frontendPort even though it is already bound."; return $frontendPort }
+          'cancel' { Write-Warn 'Deployment cancelled by user.'; exit 0 }
+          'choose-new' { }
+        }
+      } else {
+        Write-Info "Port $frontendPort is occupied. Choose a different port to avoid conflicts."
+      }
+    }
+
+    $frontendPort = Read-RequiredValue -Message 'Enter a new frontend port' -Default $frontendPort
+    Set-EnvValue -Path $EnvPath -Key 'FRONTEND_PORT' -Value $frontendPort
+    Write-Info "Updated FRONTEND_PORT in $EnvPath to $frontendPort. Rechecking on remote host..."
+  }
 }
 
 # 1) Check dependencies
@@ -408,6 +516,9 @@ $envValues = Read-EnvDeployValues -Path $envDeployPath
 $method = "local"
 
 $hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+$frontendPort = Test-FrontendPortAvailable -EnvPath $envDeployPath -HasExistingCompose $hasExistingCompose -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -CheckScriptName $checkPortScriptName -SudoPassword $sudoPassword
+# refresh env values after potential edits
+$envValues = Read-EnvDeployValues -Path $envDeployPath
 
 if ($hasExistingCompose) {
   Write-Section "Existing deployment found"

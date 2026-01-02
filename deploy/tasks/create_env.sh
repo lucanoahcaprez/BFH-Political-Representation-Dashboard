@@ -118,4 +118,3 @@ BACKEND_IMAGE=$BACKEND_IMAGE
 EOF
 
 log_info ".env.deploy written to $env_file"
-printf '%s\n' "$env_file"

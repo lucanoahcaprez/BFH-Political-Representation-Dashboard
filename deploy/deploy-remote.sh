@@ -41,6 +41,20 @@ prompt_required() {
   printf '%s' "$value"
 }
 
+set_env_value() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+
+  # replace the key with the new value if exists, append if key not present
+  if grep -qE "^${key}=" "$file" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$file"
+  fi
+}
+
+
 print_usage() {
   cat <<EOF
 Usage: $(basename "$0") [--shutdown] [--connect-timeout SECONDS] [--connect-delay SECONDS]
@@ -83,6 +97,7 @@ REMOTE_TASKS_DIR="/tmp/pol-dashboard-tasks"
 CHECK_SCRIPT_NAME="check_remote_compose.sh"
 SHUTDOWN_SCRIPT_NAME="shutdown_remote_compose.sh"
 CHECK_SUDO_SCRIPT_NAME="check_sudo.sh"
+CHECK_PORT_SCRIPT_NAME="check_port_available.sh"
 
 on_error() {
   log_error "Deployment failed. Review $LOG_FILE for details."
@@ -134,6 +149,60 @@ invoke_deployment_sync() {
   fi
 
   invoke_sync_strategy "$user" "$server" "$port" "$remote_dir" "$deploy_root" "$env_file"
+}
+
+ensure_frontend_port_available() {
+  local env_path="$1"
+  local existing_compose="$2"
+
+  local frontend_port
+  frontend_port="$(read_env_value "$env_path" "FRONTEND_PORT")"
+  [ -n "$frontend_port" ] || frontend_port="8080"
+
+  while true; do
+    local result
+    result="$(check_remote_port_available "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$frontend_port" "$CHECK_PORT_SCRIPT_NAME" "$sudo_password")"
+    if printf '%s' "$result" | grep -q '^available'; then
+      log_success "Frontend port $frontend_port is available on $ssh_host."
+      return
+    fi
+
+    if printf '%s' "$result" | grep -q '^error:'; then
+      log_warn "Could not verify port availability on $ssh_host (response: $result)."
+      if confirm_action "Continue with port $frontend_port anyway?"; then
+        return
+      fi
+    else
+      local detail="${result#in_use:}"
+      log_warn "Port $frontend_port is already in use on $ssh_host."
+      if [ -n "$detail" ]; then
+        log_info "Socket info: $detail"
+      fi
+
+      if [ "$existing_compose" = true ]; then
+        local choice
+        choice="$(read_choice "Options: reuse (only choose reuse if you have already deployed this webapplication once. if not choose an other port), choose-new, cancel" "reuse" "choose-new" "cancel")"
+        case "$choice" in
+          reuse)
+            log_info "Reusing port $frontend_port even though it is already bound."
+            return
+            ;;
+          cancel)
+            log_warn "Deployment cancelled by user."
+            exit 0
+            ;;
+          choose-new)
+            ;;
+        esac
+      else
+        log_info "Port $frontend_port is occupied. Choose a different port to avoid conflicts."
+      fi
+    fi
+
+    frontend_port="$(prompt_required "Enter a new frontend port" "$frontend_port")"
+    set_env_value "$env_path" "FRONTEND_PORT" "$frontend_port"
+    log_info "Updated FRONTEND_PORT in $env_path to $frontend_port. Rechecking on remote host..."
+  done
 }
 
 # 1) Check dependencies
@@ -257,6 +326,8 @@ has_existing_compose=false
 if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME"; then
   has_existing_compose=true
 fi
+
+ensure_frontend_port_available "$env_deploy_path" "$has_existing_compose"
 
 if [ "$has_existing_compose" = true ]; then
   section "Existing deployment found"

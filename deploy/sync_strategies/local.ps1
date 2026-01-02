@@ -39,16 +39,16 @@ function Invoke-SyncStrategy {
     }
 
     $resolved = (Resolve-Path $inputValue).ProviderPath
-    $compose = Join-Path $resolved 'docker-compose.yml'
+    $compose = Join-Path $resolved 'docker-compose.prod.yml'
     if (-not (Test-Path $compose)) {
-      Write-Warn "docker-compose.yml not found in $resolved"
+      Write-Warn "docker-compose.prod.yml not found in $resolved"
       continue
     }
 
     $localRoot = $resolved
   } until ($localRoot)
 
-  $requiredItems = @('backend', 'frontend', 'docker-compose.yml', 'docker-compose.prod.yml')
+  $requiredItems = @('backend', 'frontend', 'docker-compose.prod.yml')
   foreach ($item in $requiredItems) {
     $path = Join-Path $localRoot $item
     if (-not (Test-Path $path)) {
