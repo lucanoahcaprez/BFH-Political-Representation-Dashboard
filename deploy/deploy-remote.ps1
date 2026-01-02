@@ -383,7 +383,7 @@ function Test-FrontendPortAvailable {
       }
 
       if ($HasExistingCompose) {
-        $choice = Read-Choice -Message "Options: reuse (assume existing deployment), choose-new, cancel" -Options @('reuse','choose-new','cancel')
+        $choice = Read-Choice -Message "Options: reuse (only choose reuse if you have already deployed this web application once. if not choose an other port), choose-new, cancel" -Options @('reuse','choose-new','cancel')
         switch ($choice) {
           'reuse' { Write-Info "Reusing port $frontendPort even though it is already bound."; return $frontendPort }
           'cancel' { Write-Warn 'Deployment cancelled by user.'; exit 0 }

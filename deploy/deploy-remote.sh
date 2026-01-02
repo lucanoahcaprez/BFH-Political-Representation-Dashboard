@@ -181,7 +181,7 @@ ensure_frontend_port_available() {
 
       if [ "$existing_compose" = true ]; then
         local choice
-        choice="$(read_choice "Options: reuse (only choose reuse if you have already deployed this webapplication once. if not choose an other port), choose-new, cancel" "reuse" "choose-new" "cancel")"
+        choice="$(read_choice "Options: reuse (only choose reuse if you have already deployed this web application once. if not choose an other port), choose-new, cancel" "reuse" "choose-new" "cancel")"
         case "$choice" in
           reuse)
             log_info "Reusing port $frontend_port even though it is already bound."
