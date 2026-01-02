@@ -94,7 +94,6 @@ function Invoke-SyncStrategy {
 
     Copy-WithExcludeNodeModules -Source (Join-Path $localRoot 'backend') -Destination (Join-Path $staging 'backend')
     Copy-WithExcludeNodeModules -Source (Join-Path $localRoot 'frontend') -Destination (Join-Path $staging 'frontend')
-    Copy-Item -Path (Join-Path $localRoot 'docker-compose.yml') -Destination $staging -Force
     Copy-Item -Path (Join-Path $localRoot 'docker-compose.prod.yml') -Destination $staging -Force
     Copy-Item -Path $Context.EnvFile -Destination $staging -Force
 
@@ -106,7 +105,6 @@ function Invoke-SyncStrategy {
     '-r',
     (Join-Path $staging 'backend'),
       (Join-Path $staging 'frontend'),
-      (Join-Path $staging 'docker-compose.yml'),
       (Join-Path $staging 'docker-compose.prod.yml'),
       (Join-Path $staging '.env.deploy'),
       $destination

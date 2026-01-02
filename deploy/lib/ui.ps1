@@ -141,7 +141,7 @@ function Read-Value {
     [string]$Default = $null
   )
 
-  $prompt = if ($null -ne $Default -and $Default -ne '') { "$Message [$Default]" } else { $Message }
+  $prompt = if ($null -ne $Default -and $Default -ne '') { "$Message [leave empty for default '$Default']" } else { $Message }
   Write-ColoredPrompt -Message $prompt -Color 'Cyan'
   $inputValue = Read-Host
   if ([string]::IsNullOrWhiteSpace($inputValue) -and $null -ne $Default) { return $Default }

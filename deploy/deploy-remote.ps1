@@ -300,7 +300,7 @@ Test-Command 'ssh-keygen'
 
 # 2) Ask for SSH connection details
 Write-Section "Connection"
-$sshhost = Read-RequiredValue -Message 'Remote host (IP or DNS)'
+$sshhost = Read-RequiredValue -Message 'Remote host (IP-address or domain name)'
 $portInput = Read-Value -Message 'SSH port' -Default '22'
 $port = [int]$portInput
 $user = Read-RequiredValue -Message 'SSH user (root skips sudo prompts)'
@@ -391,7 +391,7 @@ Write-Info "In docker-compose, an environment file centralizes configuration lik
 Write-Info "We will create .env.deploy locally and copy it alongside the application files on the remote host so the stack reads consistent settings."
 Write-Info "Step: Create or confirm deployment environment values (.env.deploy)"
 Write-Info "Action: confirm defaults or customize ports/app domain used by docker-compose."
-$useEnvDefaults = Confirm-Action -Message 'Use default environment values (ports 8080/3000/5432, postgres user)?'
+$useEnvDefaults = Confirm-Action -Message "Use default environment values (frontend port '8080', postgres user 'postgres')?"
 $createEnv = Join-Path $PSScriptRoot 'tasks\create_env.ps1'
 $envFile = & $createEnv -UseDefaults:$useEnvDefaults
 $envDeployPath = Join-Path (Get-Location) '.env.deploy'

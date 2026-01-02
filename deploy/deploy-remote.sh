@@ -144,10 +144,10 @@ require_cmd ssh-keygen
 
 # 2) Ask for SSH connection details
 section "Connection"
-ssh_host="$(prompt_required "Remote host (IP or DNS)")"
+ssh_host="$(prompt_required "Remote host (IP-address or domain name)")"
 port_input="$(read_value "SSH port" "22")"
 ssh_port="${port_input:-22}"
-ssh_user="$(prompt_required "SSH user (root skips sudo prompts)")"
+ssh_user="$(prompt_required "SSH user")"
 is_root_user=false
 if [ "$ssh_user" = "root" ]; then
   is_root_user=true
@@ -233,7 +233,7 @@ log_info "We will create .env.deploy locally and copy it alongside the applicati
 log_info "Step: Create or confirm deployment environment values (.env.deploy)"
 log_info "Action: confirm defaults or customize ports/app domain used by docker-compose."
 use_env_defaults=false
-if confirm_action "Use default environment values (ports 8080/3000/5432, postgres user)?"; then
+if confirm_action "Use default environment values (frontend port '8080', postgres user 'postgres')?"; then
   use_env_defaults=true
 fi
 env_creator="$SCRIPT_DIR/tasks/create_env.sh"
