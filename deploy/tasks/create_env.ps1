@@ -28,16 +28,12 @@ function Protect-Value {
 }
 
 if ($UseDefaults) {
-  Write-Info "Using default environment values (ports 8080/3000/5432, user postgres)."
+  Write-Info "Using default environment values (frontend port '8080', user 'postgres')."
   $FRONTEND_PORT  = $DefaultFrontend
-  $BACKEND_PORT   = $DefaultBackend
-  $DB_PORT        = $DefaultDbPort
   $POSTGRES_USER  = $DefaultDbUser
 } else {
   # Collect values interactively
   $FRONTEND_PORT = Read-Value -Message 'Frontend port' -Default $DefaultFrontend
-  $BACKEND_PORT = Read-Value -Message 'Backend port' -Default $DefaultBackend
-  $DB_PORT = Read-Value -Message 'Database port' -Default $DefaultDbPort
   $POSTGRES_USER = Read-Value -Message 'Postgres user' -Default $DefaultDbUser
 }
 
@@ -55,8 +51,6 @@ $BACKEND_IMAGE = $DefaultBackendImg
 
 $values = [ordered]@{
   FRONTEND_PORT     = $FRONTEND_PORT
-  BACKEND_PORT      = $BACKEND_PORT
-  DB_PORT           = $DB_PORT
   POSTGRES_USER     = $POSTGRES_USER
   POSTGRES_PASSWORD = $POSTGRES_PASSWORD
   POSTGRES_DB       = $POSTGRES_DB
@@ -81,8 +75,6 @@ if (Test-Path $EnvFile) {
 
 $content = @"
 FRONTEND_PORT=$FRONTEND_PORT
-BACKEND_PORT=$BACKEND_PORT
-DB_PORT=$DB_PORT
 POSTGRES_USER=$POSTGRES_USER
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 POSTGRES_DB=$POSTGRES_DB

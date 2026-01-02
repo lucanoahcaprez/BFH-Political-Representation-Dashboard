@@ -24,7 +24,10 @@ import {mapEmpfehlung, mapThema, toBool, toInt} from "./mapping";
 dotenv.config();
 
 const SWISSVOTES_CSV_URL = "https://swissvotes.ch/page/dataset/swissvotes_dataset.csv";
-
+const SWISSVOTES_FETCH_RETRIES = Number(process.env.SWISSVOTES_FETCH_RETRIES || 3);
+const SWISSVOTES_FETCH_RETRY_DELAY_MS = Number(process.env.SWISSVOTES_FETCH_RETRY_DELAY_MS || 5000);
+const SWISSVOTES_FETCH_TIMEOUT_MS = Number(process.env.SWISSVOTES_FETCH_TIMEOUT_MS || 15000);
+ 
 const parteien = [
     "fdp", "sps", "svp", "mitte", "evp", "gps", "glp",
     "pda", "sd", "edu", "fps", "lega", "kvp", "mcg",
@@ -54,7 +57,7 @@ function formatDate(dateStr: string): string {
  */
 export async function fetchSwissvotesData(client: Client | Pool) {
     try {
-        const response = await axios.get(SWISSVOTES_CSV_URL, {responseType: "stream"});
+        const response = await downloadSwissvotesStream();
        await client.query(` CREATE TABLE IF NOT EXISTS meta (
        key TEXT PRIMARY KEY,
       value TEXT
@@ -182,6 +185,30 @@ export async function fetchSwissvotesData(client: Client | Pool) {
     } catch (error) {
         console.error("Error downloading or processing Swissvotes dataset:", error);
     }
+}
+
+async function downloadSwissvotesStream() {
+    let lastError: any = null;
+
+    for (let attempt = 1; attempt <= SWISSVOTES_FETCH_RETRIES; attempt++) {
+        try {
+            console.log(`Fetching Swissvotes CSV (attempt ${attempt}/${SWISSVOTES_FETCH_RETRIES})...`);
+            return await axios.get(SWISSVOTES_CSV_URL, {
+                responseType: "stream",
+                timeout: SWISSVOTES_FETCH_TIMEOUT_MS
+            });
+        } catch (error) {
+            lastError = error;
+            if (attempt < SWISSVOTES_FETCH_RETRIES) {
+                console.warn(
+                    `Swissvotes download failed (attempt ${attempt}): ${error}. Retrying in ${SWISSVOTES_FETCH_RETRY_DELAY_MS}ms...`
+                );
+                await new Promise((resolve) => setTimeout(resolve, SWISSVOTES_FETCH_RETRY_DELAY_MS));
+            }
+        }
+    }
+
+    throw lastError;
 }
 
 /**
