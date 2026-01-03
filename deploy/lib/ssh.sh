@@ -112,6 +112,28 @@ copy_remote_script() {
   rm -f "$temp"
 }
 
+check_remote_port_available() {
+  local user="$1"
+  local server="$2"
+  local port="$3"
+  local timeout="$4"
+  local remote_tasks_dir="$5"
+  local frontend_port="$6"
+  local check_script="$7"
+  local sudo_password="${8:-}"
+
+  local env_assignments=()
+  env_assignments+=("REMOTE_PORT='$(escape_squotes "$frontend_port")'")
+  if [ -n "$sudo_password" ]; then
+    env_assignments+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
+  fi
+
+  local env_prefix
+  env_prefix="$(printf '%s ' "${env_assignments[@]}")"
+  local cmd="cd '$remote_tasks_dir' && chmod +x '$check_script' && ${env_prefix}bash '$check_script'"
+  invoke_ssh_script_output "$user" "$server" "$port" "$timeout" "$cmd"
+}
+
 install_public_key_remote() {
   local user="$1"
   local server="$2"

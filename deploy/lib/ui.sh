@@ -108,7 +108,7 @@ read_value() {
   local default="${2:-}"
   local prompt="$message"
   if [ -n "$default" ]; then
-    prompt="$message [$default]"
+    prompt="$message [leave empty for default '$default']"
   fi
   read_prompt "$prompt"
   IFS= read -r input_value || true

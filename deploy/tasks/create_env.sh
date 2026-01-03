@@ -34,8 +34,6 @@ EOF
 done
 
 DEFAULT_FRONTEND="8080"
-DEFAULT_BACKEND="3000"
-DEFAULT_DB_PORT="5432"
 DEFAULT_DB_USER="postgres"
 DEFAULT_POSTGRES_DB="political_dashboard"
 DEFAULT_FRONTEND_IMG="political-dashboard-frontend"
@@ -59,15 +57,11 @@ mask_value() {
 }
 
 if [ "$use_defaults" = true ]; then
-  log_info "Using default environment values (ports 8080/3000/5432, user postgres)."
+  log_info "Using default environment values (frontend port '8080', user 'postgres')."
   FRONTEND_PORT="$(strip_newlines "$DEFAULT_FRONTEND")"
-  BACKEND_PORT="$(strip_newlines "$DEFAULT_BACKEND")"
-  DB_PORT="$(strip_newlines "$DEFAULT_DB_PORT")"
   POSTGRES_USER="$(strip_newlines "$DEFAULT_DB_USER")"
 else
   FRONTEND_PORT="$(strip_newlines "$(read_value "Frontend port" "$DEFAULT_FRONTEND")")"
-  BACKEND_PORT="$(strip_newlines "$(read_value "Backend port" "$DEFAULT_BACKEND")")"
-  DB_PORT="$(strip_newlines "$(read_value "Database port" "$DEFAULT_DB_PORT")")"
   POSTGRES_USER="$(strip_newlines "$(read_value "Postgres user" "$DEFAULT_DB_USER")")"
 fi
 
@@ -88,8 +82,6 @@ log_info ""
 log_info "Summary:"
 for entry in \
   "FRONTEND_PORT=$FRONTEND_PORT" \
-  "BACKEND_PORT=$BACKEND_PORT" \
-  "DB_PORT=$DB_PORT" \
   "POSTGRES_USER=$POSTGRES_USER" \
   "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" \
   "POSTGRES_DB=$POSTGRES_DB" \
@@ -117,8 +109,6 @@ fi
 
 cat >"$env_file" <<EOF
 FRONTEND_PORT=$FRONTEND_PORT
-BACKEND_PORT=$BACKEND_PORT
-DB_PORT=$DB_PORT
 POSTGRES_USER=$POSTGRES_USER
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 POSTGRES_DB=$POSTGRES_DB
@@ -128,4 +118,3 @@ BACKEND_IMAGE=$BACKEND_IMAGE
 EOF
 
 log_info ".env.deploy written to $env_file"
-printf '%s\n' "$env_file"
