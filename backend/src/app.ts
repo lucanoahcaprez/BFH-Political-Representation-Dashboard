@@ -20,8 +20,11 @@ const pool = new Pool({
 
 pool.connect().then(async () => {
     console.log("PostgreSQL connected successfully.");
-    await fetchSwissvotesData(pool);
+    const success = await fetchSwissvotesData(pool);
     console.log("fetchSwissvotesData(client) wurde aufgerufen");
+    if (!success) {
+        console.warn("Initial Swissvotes fetch failed after retries; frontend will be informed via meta entries.");
+    }
 }).catch((err) => {
     console.error("PostgreSQL connection error:", err);
 });
@@ -356,12 +359,28 @@ app.get("/api/diagram/themenanalyse", async (req, res) => {
 app.get("/api/last-update", async (req, res) => {
     console.log("Backend API DB URL:", process.env.DATABASE_URL)
 
-    pool.query("SELECT value FROM meta WHERE key = $1", ['last_update'])
+    const metaKeys = [
+        "last_update",
+        "swissvotes_last_fetch_status",
+        "swissvotes_last_fetch_timestamp",
+        "swissvotes_last_fetch_error"
+    ];
+
+    pool.query("SELECT key, value FROM meta WHERE key = ANY($1)", [metaKeys])
         .then(result => {
-            if (result.rows.length === 0) {
-                return res.status(404).json({ error: 'Not found' });
+            const meta: Record<string, string | null> = {};
+            for (const row of result.rows) {
+                meta[row.key] = row.value;
             }
-            res.json({ lastModified: result.rows[0].value });
+
+            res.json({
+                lastModified: meta["last_update"] ?? null,
+                swissvotesFetch: {
+                    status: meta["swissvotes_last_fetch_status"] ?? null,
+                    timestamp: meta["swissvotes_last_fetch_timestamp"] ?? null,
+                    error: (meta["swissvotes_last_fetch_error"] ?? "") || null
+                }
+            });
         })
         .catch(error => {
             console.error("Fehler beim Abrufen des letzten Updates:", error);

@@ -9,3 +9,6 @@ deploy/logs/
 
 # notes
 notes
+
+# dataset
+*.csv
