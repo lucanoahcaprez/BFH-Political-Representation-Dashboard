@@ -183,6 +183,8 @@
     "license": "Tutto il codice sorgente è concesso in licenza",
     "lastUpdate": "Ultimo aggiornamento del database",
     "loading": "caricamento...",
-    "validatorsTitle": "Verifiche di validazione e sicurezza:"
+    "validatorsTitle": "Verifiche di validazione e sicurezza:",
+    "lastSwissvotesFetch": "Ultimo import Swissvotes",
+    "fetchFailed": "Import Swissvotes non riuscito"
   }
 }

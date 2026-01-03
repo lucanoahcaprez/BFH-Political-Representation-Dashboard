@@ -183,6 +183,8 @@
     "license": "Der gesamte Quellcode steht unter der",
     "lastUpdate": "Letztes Datenbank-Update",
     "loading": "lädt...",
-    "validatorsTitle": "Validierung und Sicherheitschecks:"
+    "validatorsTitle": "Validierung und Sicherheitschecks:",
+    "lastSwissvotesFetch": "Letzter Swissvotes-Abruf",
+    "fetchFailed": "Swissvotes-Abruf fehlgeschlagen"
   }
 }

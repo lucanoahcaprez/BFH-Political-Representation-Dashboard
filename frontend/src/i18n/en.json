@@ -183,6 +183,8 @@
     "license": "The entire source code is licensed under the",
     "lastUpdate": "Last database update",
     "loading": "loading...",
-    "validatorsTitle": "Validation and security checks:"
+    "validatorsTitle": "Validation and security checks:",
+    "lastSwissvotesFetch": "Last Swissvotes fetch",
+    "fetchFailed": "Swissvotes fetch failed"
   }
 }

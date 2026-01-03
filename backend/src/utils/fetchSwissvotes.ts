@@ -27,6 +27,12 @@ const SWISSVOTES_CSV_URL = "https://swissvotes.ch/page/dataset/swissvotes_datase
 const SWISSVOTES_FETCH_RETRIES = Number(process.env.SWISSVOTES_FETCH_RETRIES || 3);
 const SWISSVOTES_FETCH_RETRY_DELAY_MS = Number(process.env.SWISSVOTES_FETCH_RETRY_DELAY_MS || 5000);
 const SWISSVOTES_FETCH_TIMEOUT_MS = Number(process.env.SWISSVOTES_FETCH_TIMEOUT_MS || 15000);
+const META_KEYS = {
+    lastUpdate: "last_update",
+    fetchStatus: "swissvotes_last_fetch_status",
+    fetchTimestamp: "swissvotes_last_fetch_timestamp",
+    fetchError: "swissvotes_last_fetch_error"
+};
  
 const parteien = [
     "fdp", "sps", "svp", "mitte", "evp", "gps", "glp",
@@ -55,14 +61,12 @@ function formatDate(dateStr: string): string {
  *
  * @param {Client | Pool} client - PostgreSQL client or connection pool
  */
-export async function fetchSwissvotesData(client: Client | Pool) {
+export async function fetchSwissvotesData(client: Client | Pool): Promise<boolean> {
+    await ensureMetaTable(client);
+
     try {
         const response = await downloadSwissvotesStream();
-       await client.query(` CREATE TABLE IF NOT EXISTS meta (
-       key TEXT PRIMARY KEY,
-      value TEXT
-  );
-`);
+
         // Tabellenstruktur sicherstellen
         await client.query(`
             CREATE TABLE IF NOT EXISTS swissvotes
@@ -182,9 +186,29 @@ export async function fetchSwissvotesData(client: Client | Pool) {
 
         await parseAndStoreData(client, response.data as Readable);
 
+        await recordFetchMeta(client, {
+            status: "success",
+            error: null
+        });
+
+        return true;
     } catch (error) {
         console.error("Error downloading or processing Swissvotes dataset:", error);
+        await recordFetchMeta(client, {
+            status: "failed",
+            error: error instanceof Error ? error.message : String(error)
+        });
+        return false;
     }
+}
+
+async function ensureMetaTable(client: Client | Pool) {
+    await client.query(`
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
+    `);
 }
 
 async function downloadSwissvotesStream() {
@@ -209,6 +233,31 @@ async function downloadSwissvotesStream() {
     }
 
     throw lastError;
+}
+
+async function recordFetchMeta(
+    client: Client | Pool,
+    {status, error}: { status: "success" | "failed"; error: string | null }
+) {
+    const now = new Date().toISOString();
+
+    await client.query(`
+        INSERT INTO meta (key, value)
+        VALUES ($1, $2)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    `, [META_KEYS.fetchStatus, status]);
+
+    await client.query(`
+        INSERT INTO meta (key, value)
+        VALUES ($1, $2)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    `, [META_KEYS.fetchTimestamp, now]);
+
+    await client.query(`
+        INSERT INTO meta (key, value)
+        VALUES ($1, $2)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    `, [META_KEYS.fetchError, error ?? ""]);
 }
 
 /**
@@ -333,4 +382,3 @@ async function parseAndStoreData(client: Client | Pool, stream: Readable): Promi
             });
     });
 }
-
