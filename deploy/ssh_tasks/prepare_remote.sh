@@ -206,7 +206,7 @@ main() {
     ensure_compose
 
     compose_cmd="$(detect_compose_cmd)"
-    printf "DOCKER_COMPOSE_CMD='%s'\n" "$compose_cmd" > "$REMOTE_DIR/.compose_cmd"
+    run_cmd sh -c 'printf "DOCKER_COMPOSE_CMD=\"%s\"\n" "$1" > "$2"' _ "$compose_cmd" "$REMOTE_DIR/.compose_cmd"
     ensure_owned_by_user "$REMOTE_DIR/.compose_cmd"
 
     log "ended preparation"

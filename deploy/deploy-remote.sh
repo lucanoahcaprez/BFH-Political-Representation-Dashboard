@@ -98,6 +98,7 @@ CHECK_SCRIPT_NAME="check_remote_compose.sh"
 SHUTDOWN_SCRIPT_NAME="shutdown_remote_compose.sh"
 CHECK_SUDO_SCRIPT_NAME="check_sudo.sh"
 CHECK_PORT_SCRIPT_NAME="check_port_available.sh"
+CHECK_OWNER_SCRIPT_NAME="check_owner_exists.sh"
 
 on_error() {
   log_error "Deployment failed. Review $LOG_FILE for details."
@@ -205,6 +206,32 @@ ensure_frontend_port_available() {
   done
 }
 
+ensure_remote_owner_exists() {
+  local owner_user="$1"
+  local owner_group="$2"
+
+  local env_prefix
+  env_prefix="REMOTE_OWNER_USER='$(escape_squotes "$owner_user")' REMOTE_OWNER_GROUP='$(escape_squotes "$owner_group")'"
+  local cmd="cd '$REMOTE_TASKS_DIR' && chmod +x '$CHECK_OWNER_SCRIPT_NAME' && ${env_prefix} bash '$CHECK_OWNER_SCRIPT_NAME'"
+  local result
+  result="$(invoke_ssh_script_output "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$cmd")"
+
+  if printf '%s' "$result" | grep -q '^ok:'; then
+    return 0
+  fi
+
+  if printf '%s' "$result" | grep -q '^missing_user:'; then
+    log_warn "Remote user '$owner_user' does not exist on $ssh_host." >&2
+  fi
+  if printf '%s' "$result" | grep -q '^missing_group:'; then
+    log_warn "Remote group '$owner_group' does not exist on $ssh_host." >&2
+  fi
+  if ! printf '%s' "$result" | grep -qE '^missing_(user|group):'; then
+    log_warn "Could not validate remote owner on $ssh_host (response: $result)" >&2
+  fi
+  return 1
+}
+
 # 1) Check dependencies
 log_info "Check local prerequisites (ssh, scp, ssh-keygen) on $(hostname)"
 require_cmd ssh
@@ -276,6 +303,29 @@ if [ "$is_root_user" = false ]; then
 else
   log_info "Connected as root; skipping sudo password prompt."
 fi
+
+remote_owner_user=""
+remote_owner_group=""
+section "Ownership"
+if confirm_action "Use a different user/group to own the remote deploy directory?"; then
+  while true; do
+    remote_owner_user="$(prompt_required "Remote owner user")"
+    remote_owner_group="$(prompt_required "Remote owner group")"
+    log_info "Validating remote user/group on $ssh_host..."
+    if ensure_remote_owner_exists "$remote_owner_user" "$remote_owner_group"; then
+      log_success "Remote ownership will be set to ${remote_owner_user}:${remote_owner_group}."
+      break
+    fi
+
+    if ! confirm_action "User or group missing on remote. Enter values again?"; then
+      log_error "Remote ownership validation failed. Aborting."
+      exit 1
+    fi
+  done
+else
+  log_info "Using SSH user for remote directory ownership."
+fi
+
 # 7) Prompt for remote directory and optional shutdown
 section "Remote target"
 log_info "Choose remote deploy directory. Thats where your web application files will live. We create the directory for you if it is missing."
@@ -348,6 +398,7 @@ cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
 if [ "$is_root_user" = false ]; then
   cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
 fi
+
 prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && ${cmd_env[*]} bash 'prepare_remote.sh'"
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$prep_cmd"
 log_success "Remote preparation complete."
@@ -358,7 +409,12 @@ invoke_deployment_sync "$method" "$ssh_user" "$ssh_host" "$ssh_port" "$remote_di
 log_success "Sync via '$method' completed."
 set_ui_log_file "$LOG_FILE"
 # 13) Deploy application on remote host
-
+if [ -n "$remote_owner_user" ]; then
+  cmd_env+=("REMOTE_OWNER_USER='$(escape_squotes "$remote_owner_user")'")
+fi
+if [ -n "$remote_owner_group" ]; then
+  cmd_env+=("REMOTE_OWNER_GROUP='$(escape_squotes "$remote_owner_group")'")
+fi
 deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${cmd_env[*]} bash 'deploy.sh'"
 log_info "Deploy docker stack on remote machine in $remote_dir. This may take 2-3 minutes while containers build/start. Please wait..."
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$deploy_cmd"

@@ -50,6 +50,7 @@ $checkScriptName = 'check_remote_compose.sh'
 $shutdownScriptName = 'shutdown_remote_compose.sh'
 $checkSudoScriptName = 'check_sudo.sh'
 $checkPortScriptName = 'check_port_available.sh'
+$checkOwnerScriptName = 'check_owner_exists.sh'
 
 function ConvertTo-EscapedSingleQuote {
   param([Parameter(Mandatory = $true)][string]$Text)
@@ -217,6 +218,41 @@ function Check-RemotePortAvailable {
   $envPrefix = $envAssignments -join ' '
   $cmd = "cd '$RemoteTasksDir' && chmod +x '$CheckScriptName' && $envPrefix bash '$CheckScriptName'"
   return Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $cmd
+}
+
+function Test-RemoteOwnerExists {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
+    [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
+    [Parameter(Mandatory = $true)][string]$OwnerUser,
+    [Parameter(Mandatory = $true)][string]$OwnerGroup
+  )
+
+  $envAssignments = @(
+    "REMOTE_OWNER_USER='$(ConvertTo-EscapedSingleQuote $OwnerUser)'",
+    "REMOTE_OWNER_GROUP='$(ConvertTo-EscapedSingleQuote $OwnerGroup)'"
+  )
+  $envPrefix = $envAssignments -join ' '
+  $cmd = "cd '$RemoteTasksDir' && chmod +x '$checkOwnerScriptName' && $envPrefix bash '$checkOwnerScriptName'"
+  $result = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $cmd
+  $lines = $result -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+  if ($lines | Where-Object { $_ -like 'ok:*' }) {
+    return $true
+  }
+
+  $missingUser = $lines | Where-Object { $_ -like 'missing_user:*' }
+  $missingGroup = $lines | Where-Object { $_ -like 'missing_group:*' }
+
+  if ($missingUser) { Write-Warn "Remote user '$OwnerUser' does not exist on $Server." }
+  if ($missingGroup) { Write-Warn "Remote group '$OwnerGroup' does not exist on $Server." }
+  if (-not $missingUser -and -not $missingGroup) {
+    Write-Warn "Could not validate remote owner on $Server (response: $result)"
+  }
+  return $false
 }
 
 function Stop-RemoteCompose {
@@ -465,6 +501,32 @@ if (-not $isRootUser) {
   Write-Success "SUDO password ok."
 } else {
   Write-Info 'Connected as root; skipping sudo password prompt.'
+}
+
+# 6b) Optional custom remote ownership
+$remoteOwnerUser = $null
+$remoteOwnerGroup = $null
+Write-Section "Ownership"
+if (Confirm-Action -Message "Use a different user/group to own the remote deploy directory?") {
+  while ($true) {
+    $candidateUser = Read-RequiredValue -Message 'Remote owner user'
+    $candidateGroup = Read-RequiredValue -Message 'Remote owner group'
+    Write-Info "Validating remote user/group on $sshhost..."
+    $isValidOwner = Test-RemoteOwnerExists -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -OwnerUser $candidateUser -OwnerGroup $candidateGroup
+    if ($isValidOwner) {
+      $remoteOwnerUser = $candidateUser
+      $remoteOwnerGroup = $candidateGroup
+      Write-Success "Remote ownership will be set to $remoteOwnerUser`:$remoteOwnerGroup."
+      break
+    }
+
+    if (-not (Confirm-Action -Message "User or group missing on remote. Enter values again?")) {
+      Write-Error 'Remote ownership validation failed. Aborting.'
+      exit 1
+    }
+  }
+} else {
+  Write-Info 'Using SSH user for remote directory ownership.'
 }
 
 # 7) Prompt for remote directory and optional shutdown

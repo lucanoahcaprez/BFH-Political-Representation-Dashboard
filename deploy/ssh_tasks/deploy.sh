@@ -9,9 +9,6 @@ LOG_FILE="$LOG_DIR/deploy.log"
 ENV_FILE="$REMOTE_DIR/.env.deploy"
 DOCKER_COMPOSE_FILE="$REMOTE_DIR/docker-compose.prod.yml"
 
-REMOTE_USER="$(id -un)"
-REMOTE_GROUP="$(id -gn)"
-
 SUDO_CMD=""
 
 # TODO: FIX sorry, wrong password even if correct
@@ -35,6 +32,15 @@ fi
 
 if [ -n "${SUDO_PASSWORD:-}" ]; then
   SUDO_PASSWORD="${SUDO_PASSWORD%$'\r'}"
+fi
+
+REMOTE_USER="$(id -un)"
+REMOTE_GROUP="$(id -gn)"
+if [ -n "${REMOTE_OWNER_USER:-}" ]; then
+  REMOTE_USER="$REMOTE_OWNER_USER"
+fi
+if [ -n "${REMOTE_OWNER_GROUP:-}" ]; then
+  REMOTE_GROUP="$REMOTE_OWNER_GROUP"
 fi
 
 run_cmd() {
@@ -76,6 +82,10 @@ log() {
 ensure_log_dir() {
     run_cmd mkdir -p "$LOG_DIR"
     run_cmd chown "$REMOTE_USER:$REMOTE_GROUP" "$LOG_DIR"
+}
+
+ensure_remote_owned_by_target() {
+    run_cmd chown -R "$REMOTE_USER:$REMOTE_GROUP" "$REMOTE_DIR"
 }
 
 
@@ -136,6 +146,7 @@ main() {
     log "Docker up failed" >&2
     exit 1
   fi
+  ensure_remote_owned_by_target
 
   log "deploy finished successfully"
 }
