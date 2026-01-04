@@ -34,31 +34,40 @@ SUDO_CMD=""
 # Sudo handling:
 # - If running as root -> no sudo needed
 # - If not root -> always use sudo -S -p '' and REQUIRE SUDO_PASSWORD
+# Sudo handling:
+# - If running as root -> no sudo needed
+# - If not root -> sudo via stdin (no prompt text)
 if [ "$(id -u)" -eq 0 ]; then
-    # Already root, no sudo needed
-    SUDO_CMD=""
+  SUDO_CMD=()
 elif command -v sudo >/dev/null 2>&1; then
-    # Non-root: always use sudo with password via stdin
-    SUDO_CMD="sudo -S -p ''"
+  SUDO_CMD=(sudo -S -p "")
 else
-    log "This script requires root or sudo to install dependencies and adjust ownership" >&2
-    exit 1
+  log "This script requires root or sudo to install dependencies and adjust ownership" >&2
+  exit 1
 fi
 
-# If we’re going to use sudo, SUDO_PASSWORD must be provided
-if [ -n "$SUDO_CMD" ] && [ -z "${SUDO_PASSWORD:-}" ]; then
-    log "SUDO_PASSWORD is required for sudo operations" >&2
-    exit 1
+if [ "${#SUDO_CMD[@]}" -gt 0 ] && [ -z "${SUDO_PASSWORD:-}" ]; then
+  log "SUDO_PASSWORD is required for sudo operations" >&2
+  exit 1
+fi
+
+if [ -n "${SUDO_PASSWORD:-}" ]; then
+  SUDO_PASSWORD="${SUDO_PASSWORD%$'\r'}"
 fi
 
 run_cmd() {
-    if [ -z "$SUDO_CMD" ]; then
-        # root: run directly
-        "$@"
-    else
-        # non-root: feed password to sudo via stdin, no prompt
-        printf '%s\n' "$SUDO_PASSWORD" | $SUDO_CMD "$@"
-    fi
+  if [ "${#SUDO_CMD[@]}" -eq 0 ]; then
+    "$@"
+  else
+    printf '%s\n' "$SUDO_PASSWORD" | "${SUDO_CMD[@]}" -- "$@"
+  fi
+}
+
+sudo_validate() {
+  if [ "${#SUDO_CMD[@]}" -eq 0 ]; then
+    return
+  fi
+  printf '%s\n' "$SUDO_PASSWORD" | "${SUDO_CMD[@]}" -v
 }
 
 require_apt() {
@@ -116,15 +125,20 @@ ensure_log_dir() {
 }
 
 ensure_docker() {
-    if command -v docker >/dev/null 2>&1; then
-        return
-    fi
+  if ! command -v docker >/dev/null 2>&1; then
     log "Installing Docker engine"
     apt_install ca-certificates curl gnupg
     apt_install docker.io
-    if command -v systemctl >/dev/null 2>&1; then
-        run_cmd systemctl enable --now docker >/dev/null 2>&1 || true
+  fi
+
+  # Start/enable if systemd is available
+  if command -v systemctl >/dev/null 2>&1; then
+    # If docker service exists, enable+start it
+    if systemctl list-unit-files | grep 'docker'; then
+      log "Ensuring Docker service is enabled and running"
+      run_cmd systemctl enable --now docker >/dev/null 2>&1 || true
     fi
+  fi
 }
 
 install_compose_binary() {
@@ -174,13 +188,13 @@ detect_compose_cmd() {
 }
 
 main() {
-    log "starting preparation"
+    sudo_validate
     ensure_log_dir
+    log "starting preparation"
 
     log "ensuring ${REMOTE_DIR} exists"
     ensure_directory "$REMOTE_DIR"
-    log "ensuring ${REMOTE_DIR}.state exists"
-    ensure_directory "$REMOTE_DIR/.state"
+
     log "ensuring ${REMOTE_DIR} is owned by ${REMOTE_USER}"
     ensure_owned_by_user "$REMOTE_DIR"
 

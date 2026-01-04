@@ -533,8 +533,7 @@ if ($hasExistingCompose) {
 # 11) Prepare remote host
 Write-Section "Prepare remote host"
 Write-Info 'Installing prerequisites (docker, docker-compose, curl, git) if necessary'
-$sudoPasswordPlain = ConvertFrom-SecureStringPlainText -SecureText $sudoPassword
-
+$sudoPasswordPlain = (ConvertFrom-SecureStringPlainText -SecureText $sudoPassword) -replace "`r|`n", ""
 $prepEnvAssignments = @("REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'")
 if (-not $isRootUser) {
   $prepEnvAssignments += 'SUDO=''sudo -S -p ""'''
@@ -545,7 +544,7 @@ if (-not $isRootUser) {
 $prepEnvAssignments = $prepEnvAssignments -join ' '
 
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
-$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh' > /dev/null 2>&1"
+$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh'"
 Write-Info "Prepare remote: running prepare_remote.sh quietly (details in $logFile)"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $remoteCmd
 Write-Success 'Remote preparation complete.'
@@ -577,7 +576,7 @@ if (-not $isRootUser) {
 }
 $deployEnvAssignments = $deployEnvAssignments -join ' '
 
-$deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh' > /dev/null 2>&1"
+$deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"
 Write-Info "Deploy docker stack on remote machine in $remoteDir"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $deployCmd
 Write-Success 'Remote deploy executed.'

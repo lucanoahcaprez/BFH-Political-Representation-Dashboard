@@ -54,8 +54,23 @@ invoke_ssh_script() {
     "set -euo pipefail; $script"
   )
 
-  if ! ssh "${args[@]}"; then
-    new_error "ssh exited with code $?"
+  local output rc
+
+  # run ssh, capturing stdout+stderr
+  if output="$(ssh "${args[@]}" 2>&1)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+
+  # always log what we got (even on failure)
+  if [ -n "$output" ]; then
+    printf '%s\n' "$output" >> "$LOG_FILE"
+  fi
+
+  # propagate failure correctly
+  if [ $rc -ne 0 ]; then
+    new_error "ssh exited with code $rc"
   fi
 }
 

@@ -269,6 +269,8 @@ if [ "$is_root_user" = false ]; then
     fi
   done
   sudo_password="$(test_remote_sudo "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$sudo_password" "$CHECK_SUDO_SCRIPT_NAME")"
+  sudo_password="${sudo_password//$'\r'/}"   # remove CR
+  sudo_password="${sudo_password//$'\n'/}"   # remove LF
   printf "\n"
   log_success "SUDO password ok."
 else
@@ -342,11 +344,11 @@ fi
 # 11) Prepare remote host
 section "Prepare remote host"
 log_info "Installing prerequisites (docker, docker-compose, curl, git) if necessary. This may take up to 2 minutes. Please wait..."
-prep_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
+cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
 if [ "$is_root_user" = false ]; then
-  prep_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
+  cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
 fi
-prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && ${prep_cmd_env[*]} bash 'prepare_remote.sh' > /dev/null 2>&1"
+prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && ${cmd_env[*]} bash 'prepare_remote.sh'"
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$prep_cmd"
 log_success "Remote preparation complete."
 
@@ -354,13 +356,10 @@ log_success "Remote preparation complete."
 section "Sync and deploy"
 invoke_deployment_sync "$method" "$ssh_user" "$ssh_host" "$ssh_port" "$remote_dir" "$SCRIPT_DIR" "$env_deploy_path"
 log_success "Sync via '$method' completed."
-
+set_ui_log_file "$LOG_FILE"
 # 13) Deploy application on remote host
-deploy_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
-if [ "$is_root_user" = false ]; then
-  deploy_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
-fi
-deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${deploy_cmd_env[*]} bash 'deploy.sh' > /dev/null 2>&1"
+
+deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${cmd_env[*]} bash 'deploy.sh'"
 log_info "Deploy docker stack on remote machine in $remote_dir. This may take 2-3 minutes while containers build/start. Please wait..."
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$deploy_cmd"
 log_success "Remote deploy executed."

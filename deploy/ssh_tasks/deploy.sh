@@ -16,19 +16,41 @@ SUDO_CMD=""
 
 # TODO: FIX sorry, wrong password even if correct
 # Sudo handling (same pattern as prepare_remote.sh)
+# Sudo handling:
+# - If running as root -> no sudo needed
+# - If not root -> sudo via stdin (no prompt text)
 if [ "$(id -u)" -eq 0 ]; then
-    SUDO_CMD=""
+  SUDO_CMD=()
 elif command -v sudo >/dev/null 2>&1; then
-    SUDO_CMD="sudo -S -p ''"
+  SUDO_CMD=(sudo -S -p "")
 else
-    echo "This script requires root or sudo to run docker commands" >&2
-    exit 1
+  log "This script requires root or sudo to install dependencies and adjust ownership" >&2
+  exit 1
 fi
 
-if [ -n "$SUDO_CMD" ] && [ -z "${SUDO_PASSWORD:-}" ]; then
-    echo "SUDO_PASSWORD is required for sudo operations" >&2
-    exit 1
+if [ "${#SUDO_CMD[@]}" -gt 0 ] && [ -z "${SUDO_PASSWORD:-}" ]; then
+  log "SUDO_PASSWORD is required for sudo operations" >&2
+  exit 1
 fi
+
+if [ -n "${SUDO_PASSWORD:-}" ]; then
+  SUDO_PASSWORD="${SUDO_PASSWORD%$'\r'}"
+fi
+
+run_cmd() {
+  if [ "${#SUDO_CMD[@]}" -eq 0 ]; then
+    "$@"
+  else
+    printf '%s\n' "$SUDO_PASSWORD" | "${SUDO_CMD[@]}" -- "$@"
+  fi
+}
+
+sudo_validate() {
+  if [ "${#SUDO_CMD[@]}" -eq 0 ]; then
+    return
+  fi
+  printf '%s\n' "$SUDO_PASSWORD" | "${SUDO_CMD[@]}" -v
+}
 
 log() {
   local ts msg host
@@ -49,14 +71,6 @@ log() {
       printf '%s\n' "$msg" >> "$LOG_FILE" 2>/dev/null || true
     fi
   fi
-}
-
-run_cmd() {
-    if [ -z "$SUDO_CMD" ]; then
-        "$@"
-    else
-        printf '%s\n' "$SUDO_PASSWORD" | $SUDO_CMD "$@"
-    fi
 }
 
 ensure_log_dir() {
@@ -95,6 +109,7 @@ compose() {
 }
 
 main() {
+  sudo_validate
   ensure_log_dir
   log "starting deploy"
 
