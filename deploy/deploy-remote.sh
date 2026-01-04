@@ -406,7 +406,7 @@ log_success "Remote preparation complete."
 # 12) Sync project using selected strategy
 section "Sync and deploy"
 invoke_deployment_sync "$method" "$ssh_user" "$ssh_host" "$ssh_port" "$remote_dir" "$SCRIPT_DIR" "$env_deploy_path"
-log_success "Sync via '$method' completed."
+log_success "Sync completed."
 set_ui_log_file "$LOG_FILE"
 # 13) Deploy application on remote host
 if [ -n "$remote_owner_user" ]; then

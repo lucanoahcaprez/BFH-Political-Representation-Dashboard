@@ -635,7 +635,7 @@ $syncContext = @{
   EnvFile    = $envFile
 }
 Invoke-DeploymentSync -Method $method -Context $syncContext
-Write-Success "Sync via '$method' completed."
+Write-Success "Sync completed."
 
 
 # 13) Deploy application on remote host
@@ -658,13 +658,11 @@ Write-Success 'Remote deploy executed.'
 
 # 14) Surface useful info to the user
 Write-Section "Summary"
-$remoteLogDir = '/var/log/political-dashboard'
 $appUrl = Get-AppUrl -EnvValues $envValues -Server $sshhost
 
 Write-Info @"
 
   Project files  : $sshhost`:$remoteDir
-  Remote logs    : $sshhost`:$remoteLogDir/prepare_remote.log and deploy.log
   Local log file : $logFile
   Application    : $appUrl
 Rerun this script anytime; use -Shutdown to stop and remove the remote docker-compose stack.

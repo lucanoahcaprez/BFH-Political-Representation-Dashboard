@@ -9,7 +9,13 @@ fi
 
 new_error() {
   local message="${1:-unknown error}"
-  log_error "error: $message"
+  local log_hint=""
+  if [ -n "${UI_LOG_FILE:-}" ]; then
+    log_hint=" (see log: $UI_LOG_FILE)"
+  elif [ -n "${LOG_FILE:-}" ]; then
+    log_hint=" (see log: $LOG_FILE)"
+  fi
+  log_error "error: $message$log_hint"
   exit 1
 }
 
