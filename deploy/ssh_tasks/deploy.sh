@@ -3,9 +3,6 @@ set -euo pipefail
 
 : "${REMOTE_DIR:?REMOTE_DIR must be set}"
 
-LOG_DIR="/var/log/political-dashboard"
-LOG_FILE="$LOG_DIR/deploy.log"
-
 ENV_FILE="$REMOTE_DIR/.env.deploy"
 DOCKER_COMPOSE_FILE="$REMOTE_DIR/docker-compose.prod.yml"
 
@@ -64,24 +61,6 @@ log() {
   host="$(hostname)"
   msg="[$ts] [$host] $*"
   printf '%s\n' "$msg"
-
-  if [ -n "${LOG_FILE:-}" ] && [ -d "${LOG_DIR:-}" ]; then
-    # If we have sudo configured, write log as root via sudo.
-    # Otherwise (running as root) write directly.
-    if [ -n "${SUDO_CMD:-}" ]; then
-      # Use sh -c so sudo reads only the password from stdin,
-      # and the log message is passed as an argument.
-      run_cmd sh -c 'printf "%s\n" "$1" >> "$2"' _ "$msg" "$LOG_FILE" || true
-    else
-      # root: no sudo needed
-      printf '%s\n' "$msg" >> "$LOG_FILE" 2>/dev/null || true
-    fi
-  fi
-}
-
-ensure_log_dir() {
-    run_cmd mkdir -p "$LOG_DIR"
-    run_cmd chown "$REMOTE_USER:$REMOTE_GROUP" "$LOG_DIR"
 }
 
 ensure_remote_owned_by_target() {
@@ -125,7 +104,6 @@ compose() {
 
 main() {
   sudo_validate
-  ensure_log_dir
   log "starting deploy"
 
   if [ ! -f "$ENV_FILE" ]; then

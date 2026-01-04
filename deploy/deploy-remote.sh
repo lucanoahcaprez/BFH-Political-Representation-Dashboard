@@ -422,13 +422,11 @@ log_success "Remote deploy executed."
 
 # 14) Surface useful info to the user
 section "Summary"
-remote_log_dir="/var/log/political-dashboard"
 app_url="$(get_app_url "$env_deploy_path" "8080" "$ssh_host")"
 
 log_info "$(cat <<EOF
 
   Project files  : $ssh_host:$remote_dir
-  Remote logs    : $ssh_host:$remote_log_dir/prepare_remote.log and deploy.log
   Local log file : $LOG_FILE
   Application    : $app_url
 Rerun this script anytime; use --shutdown to stop and remove the remote docker-compose stack.

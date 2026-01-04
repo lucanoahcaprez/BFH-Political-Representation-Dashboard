@@ -9,24 +9,9 @@ log() {
   host="$(hostname)" 
   msg="[$ts] [$host] $*"
   printf '%s\n' "$msg"
-
-  if [ -n "${LOG_FILE:-}" ] && [ -d "${LOG_DIR:-}" ]; then
-    # If we have sudo configured, write log as root via sudo.
-    # Otherwise (running as root) write directly.
-    if [ -n "${SUDO_CMD:-}" ]; then
-      # Use sh -c so sudo reads only the password from stdin,
-      # and the log message is passed as an argument.
-      run_cmd sh -c 'printf "%s\n" "$1" >> "$2"' _ "$msg" "$LOG_FILE" || true
-    else
-      # root: no sudo needed
-      printf '%s\n' "$msg" >> "$LOG_FILE" 2>/dev/null || true
-    fi
-  fi
 }
 REMOTE_USER="$(id -un)"
 REMOTE_GROUP="$(id -gn)"
-LOG_DIR="/var/log/political-dashboard"
-LOG_FILE="$LOG_DIR/prepare_remote.log"
 
 SUDO_CMD=""
 
@@ -119,11 +104,6 @@ ensure_owned_by_user() {
     run_cmd chown -R "$REMOTE_USER:$REMOTE_GROUP" "$path"
 }
 
-ensure_log_dir() {
-    run_cmd mkdir -p "$LOG_DIR"
-    run_cmd chown "$REMOTE_USER:$REMOTE_GROUP" "$LOG_DIR"
-}
-
 ensure_docker() {
   if ! command -v docker >/dev/null 2>&1; then
     log "Installing Docker engine"
@@ -189,7 +169,6 @@ detect_compose_cmd() {
 
 main() {
     sudo_validate
-    ensure_log_dir
     log "starting preparation"
 
     log "ensuring ${REMOTE_DIR} exists"
