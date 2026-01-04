@@ -88,6 +88,11 @@ ensure_remote_owned_by_target() {
     run_cmd chown -R "$REMOTE_USER:$REMOTE_GROUP" "$REMOTE_DIR"
 }
 
+secure_remote_permissions() {
+    # Restrict to owner/group; keep execute bit on directories and already-executable files.
+    run_cmd chmod -R u=rwX,g=rX,o= "$REMOTE_DIR"
+}
+
 
 detect_compose_cmd() {
 if [ -f "$REMOTE_DIR/.compose_cmd" ]; then
@@ -147,6 +152,7 @@ main() {
     exit 1
   fi
   ensure_remote_owned_by_target
+  secure_remote_permissions
 
   log "deploy finished successfully"
 }

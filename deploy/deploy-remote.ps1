@@ -188,10 +188,20 @@ function Test-RemoteComposePresent {
     [int]$Port = 22,
     [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
-    [Parameter(Mandatory = $true)][string]$RemoteDir
+    [Parameter(Mandatory = $true)][string]$RemoteDir,
+    [System.Security.SecureString]$SudoPassword = $null
   )
 
-  $checkCmd = "cd '$RemoteTasksDir' && chmod +x '$checkScriptName' && REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $RemoteDir)' bash '$checkScriptName'"
+  $envAssignments = @("REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $RemoteDir)'")
+  if ($SudoPassword) {
+    $plainSudo = ConvertFrom-SecureStringPlainText -SecureText $SudoPassword
+    if ($plainSudo) {
+      $envAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $plainSudo)'"
+    }
+  }
+  $envPrefix = $envAssignments -join ' '
+
+  $checkCmd = "cd '$RemoteTasksDir' && chmod +x '$checkScriptName' && $envPrefix bash '$checkScriptName'"
   $output = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $checkCmd
   return ($output -match 'present')
 }
@@ -540,7 +550,7 @@ Write-Info "Prepare remote helper directory $remoteTasksDir"
 if ($Shutdown) {
   Write-Section "Shutdown"
   Write-Info "Checking for existing docker-compose files in $remoteDir"
-  $hasCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+  $hasCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir -SudoPassword $sudoPassword
   
   if ($hasCompose) {
     Write-Info "Stopping existing docker-compose stack in $remoteDir"
@@ -577,7 +587,7 @@ $envValues = Read-EnvDeployValues -Path $envDeployPath
 # Write-Info "Selected method: $method"
 $method = "local"
 
-$hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+$hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir -SudoPassword $sudoPassword
 $frontendPort = Test-FrontendPortAvailable -EnvPath $envDeployPath -HasExistingCompose $hasExistingCompose -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -CheckScriptName $checkPortScriptName -SudoPassword $sudoPassword
 # refresh env values after potential edits
 $envValues = Read-EnvDeployValues -Path $envDeployPath
@@ -636,6 +646,9 @@ if (-not $isRootUser) {
     $deployEnvAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPasswordPlain)'"
   }
 }
+if ($remoteOwnerUser) { $deployEnvAssignments += "REMOTE_OWNER_USER='$(ConvertTo-EscapedSingleQuote $remoteOwnerUser)'" }
+if ($remoteOwnerGroup) { $deployEnvAssignments += "REMOTE_OWNER_GROUP='$(ConvertTo-EscapedSingleQuote $remoteOwnerGroup)'" }
+
 $deployEnvAssignments = $deployEnvAssignments -join ' '
 
 $deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"

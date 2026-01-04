@@ -211,8 +211,17 @@ test_remote_compose_present() {
   local remote_tasks_dir="$5"
   local remote_dir="$6"
   local check_script="$7"
+  local sudo_password="${8:-}"
 
-  local cmd="cd '$remote_tasks_dir' && chmod +x '$check_script' && REMOTE_DIR='$(escape_squotes "$remote_dir")' bash '$check_script'"
+  local env_assignments=()
+  env_assignments+=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
+  if [ -n "$sudo_password" ]; then
+    env_assignments+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
+  fi
+
+  local env_prefix
+  env_prefix="$(printf '%s ' "${env_assignments[@]}")"
+  local cmd="cd '$remote_tasks_dir' && chmod +x '$check_script' && ${env_prefix}bash '$check_script'"
   local output
   output="$(invoke_ssh_script_output "$user" "$server" "$port" "$timeout" "$cmd")"
   if printf '%s' "$output" | grep -q 'present'; then

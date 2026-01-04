@@ -336,7 +336,7 @@ log_info "Prepare remote helper directory $REMOTE_TASKS_DIR"
 if [ "$SHUTDOWN" = true ]; then
   section "Shutdown"
   log_info "Checking for existing docker-compose files in $remote_dir"
-  if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME"; then
+  if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME" "$sudo_password"; then
     log_info "Stopping existing docker-compose stack in $remote_dir"
     stop_remote_compose "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$SHUTDOWN_SCRIPT_NAME" "$sudo_password"
     log_success "Remote docker-compose stack stopped."
@@ -375,7 +375,7 @@ fi
 
 method="local"
 has_existing_compose=false
-if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME"; then
+if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME" "$sudo_password"; then
   has_existing_compose=true
 fi
 
