@@ -50,6 +50,7 @@ $checkScriptName = 'check_remote_compose.sh'
 $shutdownScriptName = 'shutdown_remote_compose.sh'
 $checkSudoScriptName = 'check_sudo.sh'
 $checkPortScriptName = 'check_port_available.sh'
+$checkOwnerScriptName = 'check_owner_exists.sh'
 
 function ConvertTo-EscapedSingleQuote {
   param([Parameter(Mandatory = $true)][string]$Text)
@@ -187,10 +188,20 @@ function Test-RemoteComposePresent {
     [int]$Port = 22,
     [int]$ConnectTimeoutSeconds = 20,
     [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
-    [Parameter(Mandatory = $true)][string]$RemoteDir
+    [Parameter(Mandatory = $true)][string]$RemoteDir,
+    [System.Security.SecureString]$SudoPassword = $null
   )
 
-  $checkCmd = "cd '$RemoteTasksDir' && chmod +x '$checkScriptName' && REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $RemoteDir)' bash '$checkScriptName'"
+  $envAssignments = @("REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $RemoteDir)'")
+  if ($SudoPassword) {
+    $plainSudo = ConvertFrom-SecureStringPlainText -SecureText $SudoPassword
+    if ($plainSudo) {
+      $envAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $plainSudo)'"
+    }
+  }
+  $envPrefix = $envAssignments -join ' '
+
+  $checkCmd = "cd '$RemoteTasksDir' && chmod +x '$checkScriptName' && $envPrefix bash '$checkScriptName'"
   $output = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $checkCmd
   return ($output -match 'present')
 }
@@ -217,6 +228,41 @@ function Check-RemotePortAvailable {
   $envPrefix = $envAssignments -join ' '
   $cmd = "cd '$RemoteTasksDir' && chmod +x '$CheckScriptName' && $envPrefix bash '$CheckScriptName'"
   return Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $cmd
+}
+
+function Test-RemoteOwnerExists {
+  param(
+    [Parameter(Mandatory = $true)][string]$User,
+    [Parameter(Mandatory = $true)][string]$Server,
+    [int]$Port = 22,
+    [int]$ConnectTimeoutSeconds = 20,
+    [Parameter(Mandatory = $true)][string]$RemoteTasksDir,
+    [Parameter(Mandatory = $true)][string]$OwnerUser,
+    [Parameter(Mandatory = $true)][string]$OwnerGroup
+  )
+
+  $envAssignments = @(
+    "REMOTE_OWNER_USER='$(ConvertTo-EscapedSingleQuote $OwnerUser)'",
+    "REMOTE_OWNER_GROUP='$(ConvertTo-EscapedSingleQuote $OwnerGroup)'"
+  )
+  $envPrefix = $envAssignments -join ' '
+  $cmd = "cd '$RemoteTasksDir' && chmod +x '$checkOwnerScriptName' && $envPrefix bash '$checkOwnerScriptName'"
+  $result = Invoke-SshScriptOutput -User $User -Server $Server -Port $Port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $cmd
+  $lines = $result -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+  if ($lines | Where-Object { $_ -like 'ok:*' }) {
+    return $true
+  }
+
+  $missingUser = $lines | Where-Object { $_ -like 'missing_user:*' }
+  $missingGroup = $lines | Where-Object { $_ -like 'missing_group:*' }
+
+  if ($missingUser) { Write-Warn "Remote user '$OwnerUser' does not exist on $Server." }
+  if ($missingGroup) { Write-Warn "Remote group '$OwnerGroup' does not exist on $Server." }
+  if (-not $missingUser -and -not $missingGroup) {
+    Write-Warn "Could not validate remote owner on $Server (response: $result)"
+  }
+  return $false
 }
 
 function Stop-RemoteCompose {
@@ -467,6 +513,32 @@ if (-not $isRootUser) {
   Write-Info 'Connected as root; skipping sudo password prompt.'
 }
 
+# 6b) Optional custom remote ownership
+$remoteOwnerUser = $null
+$remoteOwnerGroup = $null
+Write-Section "Ownership"
+if (Confirm-Action -Message "Use a different user/group to own the remote deploy directory?") {
+  while ($true) {
+    $candidateUser = Read-RequiredValue -Message 'Remote owner user'
+    $candidateGroup = Read-RequiredValue -Message 'Remote owner group'
+    Write-Info "Validating remote user/group on $sshhost..."
+    $isValidOwner = Test-RemoteOwnerExists -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -OwnerUser $candidateUser -OwnerGroup $candidateGroup
+    if ($isValidOwner) {
+      $remoteOwnerUser = $candidateUser
+      $remoteOwnerGroup = $candidateGroup
+      Write-Success "Remote ownership will be set to $remoteOwnerUser`:$remoteOwnerGroup."
+      break
+    }
+
+    if (-not (Confirm-Action -Message "User or group missing on remote. Enter values again?")) {
+      Write-Error 'Remote ownership validation failed. Aborting.'
+      exit 1
+    }
+  }
+} else {
+  Write-Info 'Using SSH user for remote directory ownership.'
+}
+
 # 7) Prompt for remote directory and optional shutdown
 Write-Section "Remote target"
 Write-Info "Choose remote deploy directory. Thats where your web application files will live. We create the directory for you if it is missing."
@@ -478,7 +550,7 @@ Write-Info "Prepare remote helper directory $remoteTasksDir"
 if ($Shutdown) {
   Write-Section "Shutdown"
   Write-Info "Checking for existing docker-compose files in $remoteDir"
-  $hasCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+  $hasCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir -SudoPassword $sudoPassword
   
   if ($hasCompose) {
     Write-Info "Stopping existing docker-compose stack in $remoteDir"
@@ -515,7 +587,7 @@ $envValues = Read-EnvDeployValues -Path $envDeployPath
 # Write-Info "Selected method: $method"
 $method = "local"
 
-$hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir
+$hasExistingCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir -SudoPassword $sudoPassword
 $frontendPort = Test-FrontendPortAvailable -EnvPath $envDeployPath -HasExistingCompose $hasExistingCompose -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -CheckScriptName $checkPortScriptName -SudoPassword $sudoPassword
 # refresh env values after potential edits
 $envValues = Read-EnvDeployValues -Path $envDeployPath
@@ -533,8 +605,7 @@ if ($hasExistingCompose) {
 # 11) Prepare remote host
 Write-Section "Prepare remote host"
 Write-Info 'Installing prerequisites (docker, docker-compose, curl, git) if necessary'
-$sudoPasswordPlain = ConvertFrom-SecureStringPlainText -SecureText $sudoPassword
-
+$sudoPasswordPlain = (ConvertFrom-SecureStringPlainText -SecureText $sudoPassword) -replace "`r|`n", ""
 $prepEnvAssignments = @("REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'")
 if (-not $isRootUser) {
   $prepEnvAssignments += 'SUDO=''sudo -S -p ""'''
@@ -545,7 +616,7 @@ if (-not $isRootUser) {
 $prepEnvAssignments = $prepEnvAssignments -join ' '
 
 # Provide sudo password via stdin to avoid interactive prompts (sudo -S)
-$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh' > /dev/null 2>&1"
+$remoteCmd = "cd '$remoteTasksDir' && chmod +x 'prepare_remote.sh' && $prepEnvAssignments bash 'prepare_remote.sh'"
 Write-Info "Prepare remote: running prepare_remote.sh quietly (details in $logFile)"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $remoteCmd
 Write-Success 'Remote preparation complete.'
@@ -564,7 +635,7 @@ $syncContext = @{
   EnvFile    = $envFile
 }
 Invoke-DeploymentSync -Method $method -Context $syncContext
-Write-Success "Sync via '$method' completed."
+Write-Success "Sync completed."
 
 
 # 13) Deploy application on remote host
@@ -575,22 +646,23 @@ if (-not $isRootUser) {
     $deployEnvAssignments += "SUDO_PASSWORD='$(ConvertTo-EscapedSingleQuote $sudoPasswordPlain)'"
   }
 }
+if ($remoteOwnerUser) { $deployEnvAssignments += "REMOTE_OWNER_USER='$(ConvertTo-EscapedSingleQuote $remoteOwnerUser)'" }
+if ($remoteOwnerGroup) { $deployEnvAssignments += "REMOTE_OWNER_GROUP='$(ConvertTo-EscapedSingleQuote $remoteOwnerGroup)'" }
+
 $deployEnvAssignments = $deployEnvAssignments -join ' '
 
-$deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh' > /dev/null 2>&1"
+$deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"
 Write-Info "Deploy docker stack on remote machine in $remoteDir"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $deployCmd
 Write-Success 'Remote deploy executed.'
 
 # 14) Surface useful info to the user
 Write-Section "Summary"
-$remoteLogDir = '/var/log/political-dashboard'
 $appUrl = Get-AppUrl -EnvValues $envValues -Server $sshhost
 
 Write-Info @"
 
   Project files  : $sshhost`:$remoteDir
-  Remote logs    : $sshhost`:$remoteLogDir/prepare_remote.log and deploy.log
   Local log file : $logFile
   Application    : $appUrl
 Rerun this script anytime; use -Shutdown to stop and remove the remote docker-compose stack.

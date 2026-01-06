@@ -3,21 +3,40 @@ set -euo pipefail
 
 : "${REMOTE_DIR:?REMOTE_DIR must be set}"
 
-# Default to sudo if available and not explicitly provided.
-if [ -z "${SUDO_CMD:-}" ] && command -v sudo >/dev/null 2>&1; then
-  SUDO_CMD="sudo -S -p ''"
+# Sudo handling:
+# - If running as root -> no sudo needed
+# - If not root -> sudo via stdin (no prompt text)
+if [ "$(id -u)" -eq 0 ]; then
+  SUDO_CMD=()
+elif command -v sudo >/dev/null 2>&1; then
+  SUDO_CMD=(sudo -S -p "")
+else
+  log "This script requires root or sudo to install dependencies and adjust ownership" >&2
+  exit 1
+fi
+
+if [ "${#SUDO_CMD[@]}" -gt 0 ] && [ -z "${SUDO_PASSWORD:-}" ]; then
+  log "SUDO_PASSWORD is required for sudo operations" >&2
+  exit 1
+fi
+
+if [ -n "${SUDO_PASSWORD:-}" ]; then
+  SUDO_PASSWORD="${SUDO_PASSWORD%$'\r'}"
 fi
 
 run_cmd() {
-  if [ -n "${SUDO_CMD:-}" ]; then
-    if [ -n "${SUDO_PASSWORD:-}" ]; then
-      printf '%s\n' "$SUDO_PASSWORD" | $SUDO_CMD "$@"
-    else
-      $SUDO_CMD "$@"
-    fi
-  else
+  if [ "${#SUDO_CMD[@]}" -eq 0 ]; then
     "$@"
+  else
+    printf '%s\n' "$SUDO_PASSWORD" | "${SUDO_CMD[@]}" -- "$@"
   fi
+}
+
+sudo_validate() {
+  if [ "${#SUDO_CMD[@]}" -eq 0 ]; then
+    return
+  fi
+  printf '%s\n' "$SUDO_PASSWORD" | "${SUDO_CMD[@]}" -v
 }
 
 choose_compose_file() {
@@ -55,6 +74,8 @@ detect_compose_cmd() {
     echo "$cmd"
   fi
 }
+
+sudo_validate
 
 compose_file="$(choose_compose_file "$REMOTE_DIR")"
 if [ -z "$compose_file" ]; then

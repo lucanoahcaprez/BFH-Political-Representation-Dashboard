@@ -36,12 +36,16 @@ function Test-SshConnection {
 # Execute a remote script via SSH. Throws on failure.
 function Invoke-SshScript {
   param(
-    [Parameter(Mandatory = $true)][string]$User,
-    [Parameter(Mandatory = $true)][string]$Server,
+    [Parameter(Mandatory)][string]$User,
+    [Parameter(Mandatory)][string]$Server,
     [int]$Port = 22,
     [int]$ConnectTimeoutSeconds = 20,
-    [Parameter(Mandatory = $true)][string]$Script
+    [Parameter(Mandatory)][string]$Script,
+    [string]$LogFile=$LogFile
   )
+
+  $tmpOut = Join-Path $env:TEMP ("ssh-out-{0}.log" -f ([guid]::NewGuid()))
+  $tmpErr = Join-Path $env:TEMP ("ssh-err-{0}.log" -f ([guid]::NewGuid()))
 
   $arguments = @(
     '-p', $Port,
@@ -53,9 +57,19 @@ function Invoke-SshScript {
     "set -euo pipefail; $Script"
   )
 
-  $process = Start-Process -FilePath 'ssh' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
-  if ($process.ExitCode -ne 0) {
-    New-Error "ssh exited with code $($process.ExitCode)"
+  try {
+    $p = Start-Process -FilePath 'ssh' -ArgumentList $arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $tmpOut -RedirectStandardError  $tmpErr
+
+    # Append both streams to your real log (preserves order per-stream, not interleaved)
+    if (Test-Path $tmpOut) { Get-Content -LiteralPath $tmpOut | Add-Content -LiteralPath $LogFile }
+    if (Test-Path $tmpErr) { Get-Content -LiteralPath $tmpErr | Add-Content -LiteralPath $LogFile }
+
+    if ($p.ExitCode -ne 0) {
+      New-Error "ssh exited with code $($p.ExitCode)"
+    }
+  }
+  finally {
+    Remove-Item -LiteralPath $tmpOut, $tmpErr -ErrorAction SilentlyContinue
   }
 }
 

@@ -6,6 +6,21 @@ function New-Error {
   param(
     [string]$Message = "unknown error"
   )
+  $logHint = $null
+  try {
+    if ($script:UiLogFile) {
+      $logHint = $script:UiLogFile
+    } elseif ($global:UiLogFile) {
+      $logHint = $global:UiLogFile
+    } elseif (Get-Variable -Name UiLogFile -Scope Script -ErrorAction SilentlyContinue) {
+      $logHint = (Get-Variable -Name UiLogFile -Scope Script -ValueOnly)
+    }
+  } catch { }
+
+  if ($logHint) {
+    Write-Host "Log file: $logHint" -ForegroundColor Red
+  }
+
   throw "error: $Message"
 }
 

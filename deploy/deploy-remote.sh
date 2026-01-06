@@ -98,6 +98,7 @@ CHECK_SCRIPT_NAME="check_remote_compose.sh"
 SHUTDOWN_SCRIPT_NAME="shutdown_remote_compose.sh"
 CHECK_SUDO_SCRIPT_NAME="check_sudo.sh"
 CHECK_PORT_SCRIPT_NAME="check_port_available.sh"
+CHECK_OWNER_SCRIPT_NAME="check_owner_exists.sh"
 
 on_error() {
   log_error "Deployment failed. Review $LOG_FILE for details."
@@ -205,6 +206,32 @@ ensure_frontend_port_available() {
   done
 }
 
+ensure_remote_owner_exists() {
+  local owner_user="$1"
+  local owner_group="$2"
+
+  local env_prefix
+  env_prefix="REMOTE_OWNER_USER='$(escape_squotes "$owner_user")' REMOTE_OWNER_GROUP='$(escape_squotes "$owner_group")'"
+  local cmd="cd '$REMOTE_TASKS_DIR' && chmod +x '$CHECK_OWNER_SCRIPT_NAME' && ${env_prefix} bash '$CHECK_OWNER_SCRIPT_NAME'"
+  local result
+  result="$(invoke_ssh_script_output "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$cmd")"
+
+  if printf '%s' "$result" | grep -q '^ok:'; then
+    return 0
+  fi
+
+  if printf '%s' "$result" | grep -q '^missing_user:'; then
+    log_warn "Remote user '$owner_user' does not exist on $ssh_host." >&2
+  fi
+  if printf '%s' "$result" | grep -q '^missing_group:'; then
+    log_warn "Remote group '$owner_group' does not exist on $ssh_host." >&2
+  fi
+  if ! printf '%s' "$result" | grep -qE '^missing_(user|group):'; then
+    log_warn "Could not validate remote owner on $ssh_host (response: $result)" >&2
+  fi
+  return 1
+}
+
 # 1) Check dependencies
 log_info "Check local prerequisites (ssh, scp, ssh-keygen) on $(hostname)"
 require_cmd ssh
@@ -269,11 +296,36 @@ if [ "$is_root_user" = false ]; then
     fi
   done
   sudo_password="$(test_remote_sudo "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$sudo_password" "$CHECK_SUDO_SCRIPT_NAME")"
+  sudo_password="${sudo_password//$'\r'/}"   # remove CR
+  sudo_password="${sudo_password//$'\n'/}"   # remove LF
   printf "\n"
   log_success "SUDO password ok."
 else
   log_info "Connected as root; skipping sudo password prompt."
 fi
+
+remote_owner_user=""
+remote_owner_group=""
+section "Ownership"
+if confirm_action "Use a different user/group to own the remote deploy directory?"; then
+  while true; do
+    remote_owner_user="$(prompt_required "Remote owner user")"
+    remote_owner_group="$(prompt_required "Remote owner group")"
+    log_info "Validating remote user/group on $ssh_host..."
+    if ensure_remote_owner_exists "$remote_owner_user" "$remote_owner_group"; then
+      log_success "Remote ownership will be set to ${remote_owner_user}:${remote_owner_group}."
+      break
+    fi
+
+    if ! confirm_action "User or group missing on remote. Enter values again?"; then
+      log_error "Remote ownership validation failed. Aborting."
+      exit 1
+    fi
+  done
+else
+  log_info "Using SSH user for remote directory ownership."
+fi
+
 # 7) Prompt for remote directory and optional shutdown
 section "Remote target"
 log_info "Choose remote deploy directory. Thats where your web application files will live. We create the directory for you if it is missing."
@@ -284,7 +336,7 @@ log_info "Prepare remote helper directory $REMOTE_TASKS_DIR"
 if [ "$SHUTDOWN" = true ]; then
   section "Shutdown"
   log_info "Checking for existing docker-compose files in $remote_dir"
-  if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME"; then
+  if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME" "$sudo_password"; then
     log_info "Stopping existing docker-compose stack in $remote_dir"
     stop_remote_compose "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$SHUTDOWN_SCRIPT_NAME" "$sudo_password"
     log_success "Remote docker-compose stack stopped."
@@ -323,7 +375,7 @@ fi
 
 method="local"
 has_existing_compose=false
-if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME"; then
+if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME" "$sudo_password"; then
   has_existing_compose=true
 fi
 
@@ -342,38 +394,39 @@ fi
 # 11) Prepare remote host
 section "Prepare remote host"
 log_info "Installing prerequisites (docker, docker-compose, curl, git) if necessary. This may take up to 2 minutes. Please wait..."
-prep_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
+cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
 if [ "$is_root_user" = false ]; then
-  prep_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
+  cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
 fi
-prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && ${prep_cmd_env[*]} bash 'prepare_remote.sh' > /dev/null 2>&1"
+
+prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && ${cmd_env[*]} bash 'prepare_remote.sh'"
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$prep_cmd"
 log_success "Remote preparation complete."
 
 # 12) Sync project using selected strategy
 section "Sync and deploy"
 invoke_deployment_sync "$method" "$ssh_user" "$ssh_host" "$ssh_port" "$remote_dir" "$SCRIPT_DIR" "$env_deploy_path"
-log_success "Sync via '$method' completed."
-
+log_success "Sync completed."
+set_ui_log_file "$LOG_FILE"
 # 13) Deploy application on remote host
-deploy_cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
-if [ "$is_root_user" = false ]; then
-  deploy_cmd_env+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
+if [ -n "$remote_owner_user" ]; then
+  cmd_env+=("REMOTE_OWNER_USER='$(escape_squotes "$remote_owner_user")'")
 fi
-deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${deploy_cmd_env[*]} bash 'deploy.sh' > /dev/null 2>&1"
+if [ -n "$remote_owner_group" ]; then
+  cmd_env+=("REMOTE_OWNER_GROUP='$(escape_squotes "$remote_owner_group")'")
+fi
+deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${cmd_env[*]} bash 'deploy.sh'"
 log_info "Deploy docker stack on remote machine in $remote_dir. This may take 2-3 minutes while containers build/start. Please wait..."
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$deploy_cmd"
 log_success "Remote deploy executed."
 
 # 14) Surface useful info to the user
 section "Summary"
-remote_log_dir="/var/log/political-dashboard"
 app_url="$(get_app_url "$env_deploy_path" "8080" "$ssh_host")"
 
 log_info "$(cat <<EOF
 
   Project files  : $ssh_host:$remote_dir
-  Remote logs    : $ssh_host:$remote_log_dir/prepare_remote.log and deploy.log
   Local log file : $LOG_FILE
   Application    : $app_url
 Rerun this script anytime; use --shutdown to stop and remove the remote docker-compose stack.

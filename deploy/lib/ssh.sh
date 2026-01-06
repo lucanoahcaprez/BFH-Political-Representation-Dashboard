@@ -54,8 +54,23 @@ invoke_ssh_script() {
     "set -euo pipefail; $script"
   )
 
-  if ! ssh "${args[@]}"; then
-    new_error "ssh exited with code $?"
+  local output rc
+
+  # run ssh, capturing stdout+stderr
+  if output="$(ssh "${args[@]}" 2>&1)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+
+  # always log what we got (even on failure)
+  if [ -n "$output" ]; then
+    printf '%s\n' "$output" >> "$LOG_FILE"
+  fi
+
+  # propagate failure correctly
+  if [ $rc -ne 0 ]; then
+    new_error "ssh exited with code $rc"
   fi
 }
 
@@ -76,9 +91,11 @@ invoke_ssh_script_output() {
     "set -euo pipefail; $script"
   )
 
-  local output
-  if ! output="$(ssh "${args[@]}")"; then
-    new_error "ssh exited with code $?"
+  local output rc
+  output="$(ssh "${args[@]}")"
+  rc=$?
+  if [ $rc -ne 0 ]; then
+    new_error "ssh exited with code $rc"
   fi
   printf '%s' "$output"
 }
@@ -194,8 +211,17 @@ test_remote_compose_present() {
   local remote_tasks_dir="$5"
   local remote_dir="$6"
   local check_script="$7"
+  local sudo_password="${8:-}"
 
-  local cmd="cd '$remote_tasks_dir' && chmod +x '$check_script' && REMOTE_DIR='$(escape_squotes "$remote_dir")' bash '$check_script'"
+  local env_assignments=()
+  env_assignments+=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
+  if [ -n "$sudo_password" ]; then
+    env_assignments+=("SUDO_PASSWORD='$(escape_squotes "$sudo_password")'")
+  fi
+
+  local env_prefix
+  env_prefix="$(printf '%s ' "${env_assignments[@]}")"
+  local cmd="cd '$remote_tasks_dir' && chmod +x '$check_script' && ${env_prefix}bash '$check_script'"
   local output
   output="$(invoke_ssh_script_output "$user" "$server" "$port" "$timeout" "$cmd")"
   if printf '%s' "$output" | grep -q 'present'; then
@@ -238,13 +264,28 @@ test_remote_sudo() {
 
   local attempt=1
   local password="$sudo_password"
+
   while [ "$attempt" -le "$max_attempts" ]; do
-    local env_prefix="SUDO_PASSWORD='$(escape_squotes "$password")'"
-    local cmd="cd '$remote_tasks_dir' && chmod +x '$check_script' && ${env_prefix} bash '$check_script'"
+    # sanitize (important on Windows/WSL terminals)
+    password="$(printf '%s' "$password" | tr -d '\r\n')"
+
+    local env_prefix
+    env_prefix="SUDO_PASSWORD='$(escape_squotes "$password")'"
+
+    local cmd
+    cmd="cd '$remote_tasks_dir' && chmod +x '$check_script' && ${env_prefix} bash '$check_script'"
+
     local result
     result="$(invoke_ssh_script_output "$user" "$server" "$port" "$timeout" "$cmd")"
 
+    # Print remote debug to stderr so it doesn't pollute stdout return value
+    # (optional, but helps troubleshooting)
+    if ! printf '%s' "$result" | grep -q '^ok:'; then
+      printf '%s\n' "$result" >&2
+    fi
+
     if printf '%s' "$result" | grep -q '^ok:'; then
+      # IMPORTANT: only output the password on stdout
       printf '%s' "$password"
       return 0
     fi
@@ -258,9 +299,10 @@ test_remote_sudo() {
     if printf '%s' "$result" | grep -q 'missing_password'; then
       new_error "Sudo password missing. Aborting."
     fi
+
     if printf '%s' "$result" | grep -q 'bad_password'; then
       if [ "$attempt" -lt "$max_attempts" ]; then
-        log_warn "Incorrect sudo password. Please try again."
+        log_warn "Incorrect sudo password. Please try again." >&2
         password="$(read_secret "SUDO password")"
         attempt=$((attempt + 1))
         continue
