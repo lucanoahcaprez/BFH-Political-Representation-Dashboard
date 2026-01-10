@@ -76,7 +76,6 @@ function Invoke-SyncStrategy {
         [Parameter(Mandatory = $true)][string]$Destination
       )
 
-      # TODO: Explain why we used robocopy
       New-Item -ItemType Directory -Path $Destination -Force | Out-Null
       $arguments = @(
         $Source,

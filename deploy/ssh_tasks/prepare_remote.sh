@@ -15,13 +15,9 @@ REMOTE_GROUP="$(id -gn)"
 
 SUDO_CMD=""
 
-# TODO: FIX sorry, wrong password even if correct
 # Sudo handling:
 # - If running as root -> no sudo needed
 # - If not root -> always use sudo -S -p '' and REQUIRE SUDO_PASSWORD
-# Sudo handling:
-# - If running as root -> no sudo needed
-# - If not root -> sudo via stdin (no prompt text)
 if [ "$(id -u)" -eq 0 ]; then
   SUDO_CMD=()
 elif command -v sudo >/dev/null 2>&1; then
