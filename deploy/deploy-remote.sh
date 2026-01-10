@@ -433,7 +433,7 @@ log_info "$(cat <<EOF
   Project files  : $ssh_host:$remote_dir
   Local log file : $LOG_FILE
   Application    : $app_url
-  Docs           : $SCRIPT_DIR/README.md
+  Docs           : $SCRIPT_DIR/README.md (Consult the README.md to get example configurations for iptables or plesk)
 Rerun this script anytime; use --shutdown to stop and remove the remote docker-compose stack.
 EOF
 )"
