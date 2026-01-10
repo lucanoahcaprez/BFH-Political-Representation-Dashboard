@@ -669,6 +669,6 @@ Write-Info @"
   Project files  : $sshhost`:$remoteDir
   Local log file : $logFile
   Application    : $appUrl
-  Docs           : $PSScriptRoot/README.md
+  Docs           : $PSScriptRoot/README.md (Consult the README.md to get example configurations for iptables or plesk)
 Rerun this script anytime; use -Shutdown to stop and remove the remote docker-compose stack.
 "@

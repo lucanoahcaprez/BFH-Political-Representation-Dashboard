@@ -371,10 +371,6 @@ if [ ! -f "$env_deploy_path" ]; then
 fi
 
 # 9) Ask deployment method (local only for now)
-# TODO: cleanup
-# method="$(read_choice "Step: Deployment method? [local]" "local")"
-# log_info "Selected method: $method"
-
 method="local"
 has_existing_compose=false
 if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME" "$sudo_password"; then
@@ -433,7 +429,7 @@ log_info "$(cat <<EOF
   Project files  : $ssh_host:$remote_dir
   Local log file : $LOG_FILE
   Application    : $app_url
-  Docs           : $SCRIPT_DIR/README.md
+  Docs           : $SCRIPT_DIR/README.md (Consult the README.md to get example configurations for iptables or plesk)
 Rerun this script anytime; use --shutdown to stop and remove the remote docker-compose stack.
 EOF
 )"

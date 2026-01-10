@@ -118,9 +118,16 @@ This dataset is regularly accessed via automated fetches. For the most recent ac
 
 ##  Project Team
 
+### Version 1
 - **Damian Lienhart**
 - **Sujal Singh Basnet**
-- Project supervised by **Dr. Simon Kramer** (BFH)
+
+### Version 2
+- **Elia Bucher**
+- **Luca Caprez**
+- **Pascal Feller**
+
+Project supervised by **Dr. Simon Kramer** (BFH)
 
 ---
 
