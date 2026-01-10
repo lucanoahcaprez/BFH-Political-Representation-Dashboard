@@ -513,7 +513,33 @@ if (-not $isRootUser) {
   Write-Info 'Connected as root; skipping sudo password prompt.'
 }
 
-# 6b) Optional custom remote ownership
+
+
+# 7) Prompt for remote directory and optional shutdown
+Write-Section "Remote target"
+Write-Info "Choose remote deploy directory. Thats where your web application files will live. We create the directory for you if it is missing."
+$remoteDir = Read-Value -Message 'Remote deploy directory' -Default '/opt/political-dashboard'
+
+
+# 7b) Check if user wants to shutdown existing docker stack
+if ($Shutdown) {
+  Write-Section "Shutdown"
+  Write-Info "Checking for existing docker-compose files in $remoteDir"
+  $hasCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir -SudoPassword $sudoPassword
+  
+  if ($hasCompose) {
+    Write-Info "Stopping existing docker-compose stack in $remoteDir"
+    Stop-RemoteCompose -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir -SudoPassword $sudoPassword
+    Write-Success "Remote docker-compose stack stopped."
+    
+  } else {
+    Write-Info "No docker-compose files found in $remoteDir"
+  }
+  Write-Success 'Shutdown flag completed. Exiting.'
+  exit 0
+}
+
+# 7c) Optional custom remote ownership
 $remoteOwnerUser = $null
 $remoteOwnerGroup = $null
 Write-Section "Ownership"
@@ -539,33 +565,8 @@ if (Confirm-Action -Message "Use a different user/group to own the remote deploy
   Write-Info 'Using SSH user for remote directory ownership.'
 }
 
-# 7) Prompt for remote directory and optional shutdown
-Write-Section "Remote target"
-Write-Info "Choose remote deploy directory. Thats where your web application files will live. We create the directory for you if it is missing."
-$remoteDir = Read-Value -Message 'Remote deploy directory' -Default '/opt/political-dashboard'
 
-Write-Info "Prepare remote helper directory $remoteTasksDir"
-
-# 8) Check if user wants to shutdown existing docker stack
-if ($Shutdown) {
-  Write-Section "Shutdown"
-  Write-Info "Checking for existing docker-compose files in $remoteDir"
-  $hasCompose = Test-RemoteComposePresent -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir -SudoPassword $sudoPassword
-  
-  if ($hasCompose) {
-    Write-Info "Stopping existing docker-compose stack in $remoteDir"
-    Stop-RemoteCompose -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -RemoteTasksDir $remoteTasksDir -RemoteDir $remoteDir -SudoPassword $sudoPassword
-    Write-Success "Remote docker-compose stack stopped."
-    
-  } else {
-    Write-Info "No docker-compose files found in $remoteDir"
-  }
-  Write-Success 'Shutdown flag completed. Exiting.'
-  exit 0
-}
-
-
-# 9) Create/update local .env.deploy
+# 8) Create/update local .env.deploy
 Write-Section "Environment file"
 Write-Info "In docker-compose, an environment file centralizes configuration like ports, domains, and credentials so containers stay configurable without editing compose YAML."
 Write-Info "We will create .env.deploy locally and copy it alongside the application files on the remote host so the stack reads consistent settings."
@@ -581,7 +582,7 @@ if (-not (Test-Path $envDeployPath)) {
 }
 $envValues = Read-EnvDeployValues -Path $envDeployPath
 
-# 10) Ask deployment method (placeholder)
+# 9) Ask deployment method (placeholder)
 # TODO: cleanup dont read the options
 # $method = Read-Choice -Message 'Step: Deployment method? [local|git|archive]' -Options @('local', 'git', 'archive')
 # Write-Info "Selected method: $method"
@@ -602,7 +603,7 @@ if ($hasExistingCompose) {
   }
 }
 
-# 11) Prepare remote host
+# 10) Prepare remote host
 Write-Section "Prepare remote host"
 Write-Info 'Installing prerequisites (docker, docker-compose, curl, git) if necessary'
 $sudoPasswordPlain = (ConvertFrom-SecureStringPlainText -SecureText $sudoPassword) -replace "`r|`n", ""
@@ -622,7 +623,7 @@ Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds
 Write-Success 'Remote preparation complete.'
 
 
-# 12) Sync project using selected strategy
+# 11) Sync project using selected strategy
 Write-Section "Sync and deploy"
 
 $syncContext = @{
@@ -638,7 +639,7 @@ Invoke-DeploymentSync -Method $method -Context $syncContext
 Write-Success "Sync completed."
 
 
-# 13) Deploy application on remote host
+# 12) Deploy application on remote host
 $deployEnvAssignments = @("REMOTE_DIR='$(ConvertTo-EscapedSingleQuote $remoteDir)'")
 if (-not $isRootUser) {
   $deployEnvAssignments += 'SUDO=''sudo -S -p ""'''
@@ -654,9 +655,12 @@ $deployEnvAssignments = $deployEnvAssignments -join ' '
 $deployCmd = "cd '$remoteTasksDir' && chmod +x 'deploy.sh' && $deployEnvAssignments bash 'deploy.sh'"
 Write-Info "Deploy docker stack on remote machine in $remoteDir"
 Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script $deployCmd
+Write-Info "Remove temp remote task dir ($remoteTasksDir)"
+Invoke-SshScript -User $user -Server $sshhost -Port $port -ConnectTimeoutSeconds $ConnectTimeoutSeconds -Script "rm -rf '$remoteTasksDir'"
+
 Write-Success 'Remote deploy executed.'
 
-# 14) Surface useful info to the user
+# 13) Surface useful info to the user
 Write-Section "Summary"
 $appUrl = Get-AppUrl -EnvValues $envValues -Server $sshhost
 
@@ -665,5 +669,6 @@ Write-Info @"
   Project files  : $sshhost`:$remoteDir
   Local log file : $logFile
   Application    : $appUrl
+  Docs           : $PSScriptRoot/README.md
 Rerun this script anytime; use -Shutdown to stop and remove the remote docker-compose stack.
 "@

@@ -304,6 +304,28 @@ else
   log_info "Connected as root; skipping sudo password prompt."
 fi
 
+
+# 7) Prompt for remote directory and optional shutdown
+section "Remote target"
+log_info "Choose remote deploy directory. Thats where your web application files will live. We create the directory for you if it is missing."
+remote_dir="$(read_value "Remote deploy directory (created if missing)" "/opt/political-dashboard")"
+
+# 7b) Check if user wants to shutdown existing docker stack
+if [ "$SHUTDOWN" = true ]; then
+  section "Shutdown"
+  log_info "Checking for existing docker-compose files in $remote_dir"
+  if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME" "$sudo_password"; then
+    log_info "Stopping existing docker-compose stack in $remote_dir"
+    stop_remote_compose "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$SHUTDOWN_SCRIPT_NAME" "$sudo_password"
+    log_success "Remote docker-compose stack stopped."
+  else
+    log_info "No docker-compose files found in $remote_dir"
+  fi
+  log_success "Shutdown flag completed. Exiting."
+  exit 0
+fi
+
+# 7c) Optional custom remote ownership
 remote_owner_user=""
 remote_owner_group=""
 section "Ownership"
@@ -326,28 +348,8 @@ else
   log_info "Using SSH user for remote directory ownership."
 fi
 
-# 7) Prompt for remote directory and optional shutdown
-section "Remote target"
-log_info "Choose remote deploy directory. Thats where your web application files will live. We create the directory for you if it is missing."
-remote_dir="$(read_value "Remote deploy directory (created if missing)" "/opt/political-dashboard")"
-log_info "Prepare remote helper directory $REMOTE_TASKS_DIR"
 
-# 8) Check if user wants to shutdown existing docker stack
-if [ "$SHUTDOWN" = true ]; then
-  section "Shutdown"
-  log_info "Checking for existing docker-compose files in $remote_dir"
-  if test_remote_compose_present "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$CHECK_SCRIPT_NAME" "$sudo_password"; then
-    log_info "Stopping existing docker-compose stack in $remote_dir"
-    stop_remote_compose "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$REMOTE_TASKS_DIR" "$remote_dir" "$SHUTDOWN_SCRIPT_NAME" "$sudo_password"
-    log_success "Remote docker-compose stack stopped."
-  else
-    log_info "No docker-compose files found in $remote_dir"
-  fi
-  log_success "Shutdown flag completed. Exiting."
-  exit 0
-fi
-
-# 9) Create/update local .env.deploy
+# 8) Create/update local .env.deploy
 section "Environment file"
 log_info "In docker-compose, an environment file centralizes configuration like ports, domains, and credentials so containers stay configurable without editing compose YAML."
 log_info "We will create .env.deploy locally and copy it alongside the application files on the remote host so the stack reads consistent settings."
@@ -368,7 +370,7 @@ if [ ! -f "$env_deploy_path" ]; then
   env_deploy_path="$SCRIPT_DIR/.env.deploy"
 fi
 
-# 10) Ask deployment method (local only for now)
+# 9) Ask deployment method (local only for now)
 # TODO: cleanup
 # method="$(read_choice "Step: Deployment method? [local]" "local")"
 # log_info "Selected method: $method"
@@ -391,7 +393,7 @@ if [ "$has_existing_compose" = true ]; then
   fi
 fi
 
-# 11) Prepare remote host
+# 10) Prepare remote host
 section "Prepare remote host"
 log_info "Installing prerequisites (docker, docker-compose, curl, git) if necessary. This may take up to 2 minutes. Please wait..."
 cmd_env=("REMOTE_DIR='$(escape_squotes "$remote_dir")'")
@@ -403,12 +405,12 @@ prep_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'prepare_remote.sh' && ${cmd_env[*]
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$prep_cmd"
 log_success "Remote preparation complete."
 
-# 12) Sync project using selected strategy
+# 11) Sync project using selected strategy
 section "Sync and deploy"
 invoke_deployment_sync "$method" "$ssh_user" "$ssh_host" "$ssh_port" "$remote_dir" "$SCRIPT_DIR" "$env_deploy_path"
 log_success "Sync completed."
 set_ui_log_file "$LOG_FILE"
-# 13) Deploy application on remote host
+# 12) Deploy application on remote host
 if [ -n "$remote_owner_user" ]; then
   cmd_env+=("REMOTE_OWNER_USER='$(escape_squotes "$remote_owner_user")'")
 fi
@@ -418,9 +420,11 @@ fi
 deploy_cmd="cd '$REMOTE_TASKS_DIR' && chmod +x 'deploy.sh' && ${cmd_env[*]} bash 'deploy.sh'"
 log_info "Deploy docker stack on remote machine in $remote_dir. This may take 2-3 minutes while containers build/start. Please wait..."
 invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "$deploy_cmd"
+log_info "Remove temp remote task dir ($REMOTE_TASKS_DIR)."
+invoke_ssh_script "$ssh_user" "$ssh_host" "$ssh_port" "$CONNECT_TIMEOUT_SECONDS" "rm -rf '$REMOTE_TASKS_DIR'"
 log_success "Remote deploy executed."
 
-# 14) Surface useful info to the user
+# 13) Surface useful info to the user
 section "Summary"
 app_url="$(get_app_url "$env_deploy_path" "8080" "$ssh_host")"
 
@@ -429,6 +433,7 @@ log_info "$(cat <<EOF
   Project files  : $ssh_host:$remote_dir
   Local log file : $LOG_FILE
   Application    : $app_url
+  Docs           : $SCRIPT_DIR/README.md
 Rerun this script anytime; use --shutdown to stop and remove the remote docker-compose stack.
 EOF
 )"

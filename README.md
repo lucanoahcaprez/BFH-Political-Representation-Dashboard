@@ -32,25 +32,46 @@ Developed as part of a student project at **Berner Fachhochschule (BFH)**.
 
 ---
 
-## Setup Instructions
+## Deployment
 
-This deployment works on macOS, Linux, and Windows (via Git Bash or WSL).
+This deployment works on macOS, Linux, and Windows.
 
+### Remote deployment
+Prerequisites: SSH port, remote host (IP or domain), and sudo or root access on the target machine.
+
+#### 1. Download the repo if not already done
+```bash
+git clone https://github.com/lucanoahcaprez/BFH-Political-Representation-Dashboard.git
+```
+#### 2. Change directory
+```bash
+cd BFH-Political-Representation-Dashboard/deploy
+```
+#### 3. Make it executable (macOS, Linux, WSL, Git Bash) -> Windows user don't have to do this part
+```bash
+chmod +x deploy
+```
+#### 4. Run the script (macOS, Linux, WSL, Git Bash)
+```bash
+./deploy-remote.sh
+```
+
+Windows users: run `deploy-remote.ps1` in PowerShell. See `deploy/README.md` for details.
+
+
+### Local deployment
 > On macOS, the script uses [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop.
 > Colima is automatically installed if Docker is not already running, making the setup lightweight and M1/M2-compatible. Colima is a container runtime for macOS that replaces Docker Desktop and integrates well with the Docker CLI.
 
-
-
-
-# 1. Download the deployment script
+#### 1. Download the deployment script
 ```bash
 curl -O https://raw.githubusercontent.com/damian-lienhart/political-representation-dashboard/main/deploy-server.sh
 ```
-# 2. Make it executable (macOS, Linux, WSL, Git Bash)
+#### 2. Make it executable (macOS, Linux, WSL, Git Bash)
 ```bash
 chmod +x deploy-server.sh
 ```
-# 3. Run the deployment script
+#### 3. Run the deployment script
 ```bash
 ./deploy-server.sh
 ```

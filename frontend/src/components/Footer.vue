@@ -67,8 +67,6 @@
             </li>
           </ul>
         </div>
-
-        <p class="footer-year">© 2025 Berner Fachhochschule</p>
       </div>
     </div>
   </footer>
