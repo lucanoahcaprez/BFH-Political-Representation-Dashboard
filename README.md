@@ -36,7 +36,7 @@ Developed as part of a student project at **Berner Fachhochschule (BFH)**.
 
 This deployment works on macOS, Linux, and Windows.
 
-### Remote deployment
+### Remote deployment (Scope of Version 2.0)
 Prerequisites: SSH port, remote host (IP or domain), and sudo or root access on the target machine.
 
 #### 1. Download the repo if not already done
@@ -59,13 +59,13 @@ chmod +x deploy
 Windows users: run `deploy-remote.ps1` in PowerShell. See `deploy/README.md` for details.
 
 
-### Local deployment
+### Local deployment (Scope of Version 1.0)
 > On macOS, the script uses [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop.
 > Colima is automatically installed if Docker is not already running, making the setup lightweight and M1/M2-compatible. Colima is a container runtime for macOS that replaces Docker Desktop and integrates well with the Docker CLI.
 
 #### 1. Download the deployment script
 ```bash
-curl -O https://raw.githubusercontent.com/damian-lienhart/political-representation-dashboard/main/deploy-server.sh
+curl -O https://raw.githubusercontent.com/lucanoahcaprez/BFH-Political-Representation-Dashboard/main/deploy-server.sh
 ```
 #### 2. Make it executable (macOS, Linux, WSL, Git Bash)
 ```bash
@@ -118,11 +118,11 @@ This dataset is regularly accessed via automated fetches. For the most recent ac
 
 ##  Project Team
 
-### Version 1
+### Version 1.0
 - **Damian Lienhart**
 - **Sujal Singh Basnet**
 
-### Version 2
+### Version 2.0
 - **Elia Bucher**
 - **Luca Caprez**
 - **Pascal Feller**
