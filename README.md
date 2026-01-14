@@ -56,8 +56,9 @@ chmod +x deploy
 ./deploy-remote.sh
 ```
 
-Windows users: run `deploy-remote.ps1` in PowerShell. See `deploy/README.md` for details.
+Windows users: run `deploy-remote.ps1` in PowerShell.
 
+For more information about the deployment, how it works under the hood and how to adjust your Pesk setup for productive operations, please see `deploy/README.md` for details.
 
 ### Local deployment (Scope of Version 1.0)
 > On macOS, the script uses [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop.
