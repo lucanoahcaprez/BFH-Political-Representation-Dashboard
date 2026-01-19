@@ -117,7 +117,27 @@ This project uses data from the [Swissvotes dataset](https://swissvotes.ch/page/
 **Source:** Swissvotes (2024), Année Politique Suisse, University of Bern.
 This dataset is regularly accessed via automated fetches. For the most recent access date, refer to the backend logs.
 
+---
 
+##  FAQ
+
+### What is the BFH Political Representation Dashboard?
+It is a web dashboard that visualizes the alignment between Swiss political institutions (Parliament, Bundesrat, political parties) and the Swiss public using the Swissvotes dataset; developed as a student project at the Bern University of Applied Sciences (BFH) under the MIT license.
+
+### What data source does the dashboard use?
+The application uses the Swissvotes dataset, which is regularly accessed and visualized to show agreement levels between public votes and institutions. If the dashboard throws an error with fetching data, you can get in touch with the responsible teams at [https://swissvotes.ch/page/home](https://swissvotes.ch/page/home).
+
+### If I am redeploying the app, what kind of persistence is provided?
+There is no  persistence implemented. The app provides additional external persistence mechanisms using Swissvote. Data is stored in PostgreSQL and must be preserved across redeployments manually (for example, via database backups). The deployment script removes all volumes using `docker compose down -v`.
+
+### Does the app automatically fetch or update data?
+The backend automatically fetches updated vote data at regular intervals (every 4 hours) using a cron job.
+
+### Is there a built-in backup mechanism?
+No automated backup mechanism is included; manual backups (e.g., using pg_dump or docker volume copy mechanisms) are necessary to retain data.
+
+### Can I use this project in my own environment?
+Yes - you can clone the repository, build the frontend and backend locally, and deploy with Docker Compose in macOS, Linux, or Windows (via Git Bash/WSL).
 
 ---
 
