@@ -114,7 +114,7 @@ main() {
   fi
 
   log "running docker compose down"
-  compose down || true
+  compose down -v || true
 
   log "running docker compose build"
   if ! compose build; then
