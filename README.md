@@ -39,17 +39,21 @@ This deployment works on macOS, Linux, and Windows.
 ### Remote deployment (Scope of Version 2.0)
 Prerequisites: SSH port, remote host (IP or domain), and sudo or root access on the target machine.
 
-#### 1. Download the repo if not already done
+#### 1. Download the repo using `git clone` or ZIP download on the Github webpage 
 ```bash
 git clone https://github.com/lucanoahcaprez/BFH-Political-Representation-Dashboard.git
 ```
-#### 2. Change directory
+#### 2a. Change directory (if cloned by GIT like in step 1)
 ```bash
 cd BFH-Political-Representation-Dashboard/deploy
 ```
+#### 2b. Change directory (if downloaded using GitHub ZIP download)
+```bash
+cd BFH-Political-Representation-Dashboard-main/deploy
+```
 #### 3. Make it executable (macOS, Linux, WSL, Git Bash) -> Windows user don't have to do this part
 ```bash
-chmod +x deploy
+chmod +x ../deploy
 ```
 #### 4. Run the script (macOS, Linux, WSL, Git Bash)
 ```bash
