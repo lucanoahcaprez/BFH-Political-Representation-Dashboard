@@ -5,6 +5,7 @@ services:
     container_name: backend
     build: ./backend
     image: ${BACKEND_IMAGE:-political-dashboard-backend}
+    restart: always
     environment:
       - PORT=3000
       - DATABASE_URL=${DATABASE_URL}
@@ -15,6 +16,7 @@ services:
     container_name: frontend
     build: ./frontend
     image: ${FRONTEND_IMAGE:-political-dashboard-frontend}
+    restart: always
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     environment:
