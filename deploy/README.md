@@ -29,6 +29,77 @@ sudo iptables -A INPUT -i lo -j ACCEPT
 3. Leave url as it is, select the 'frontend' container, select the correct port (same port as used in the deploy-remote script)
 ![Plesk - rule frontend](img/plesk_rule_frontend.png)
 
+## Troubleshooting: Containers Not Starting After Server Reboot
+
+If the Docker containers do not start automatically after a server reboot, follow these steps.
+
+### 1. Check Container Status
+
+```bash
+docker ps -a
+```
+
+This lists **all** containers (including stopped ones). You should see three containers: `backend`, `frontend`, and `db`.
+
+### 2. Manually Start the Containers
+
+Start the containers by name (as defined in `docker-compose.prod.yml`):
+
+```bash
+docker start db backend frontend
+```
+
+> **Note:** Start `db` first, since `backend` depends on it.
+
+Verify they are running:
+
+```bash
+docker ps
+```
+
+### 3. Configure Automatic Restart Behaviour
+
+The production Compose file already sets `restart: always` for all services. If containers still don't restart after a reboot, the most common cause is that the **Docker daemon itself** is not enabled as a system service.
+
+Enable and start the Docker daemon so it launches on boot:
+
+```bash
+sudo systemctl enable docker
+sudo systemctl start docker
+```
+
+You can verify the setting with:
+
+```bash
+sudo systemctl is-enabled docker
+# Expected output: enabled
+```
+
+Once the Docker daemon starts on boot, all containers with a `restart: always` policy will be started automatically.
+
+#### Restart Policy Reference
+
+| Policy             | Behaviour                                                        |
+|--------------------|------------------------------------------------------------------|
+| `no`               | Never restart automatically (default)                            |
+| `always`           | Always restart, including after daemon restart / reboot           |
+| `on-failure[:max]` | Restart only on non-zero exit code, optionally with a retry limit |
+| `unless-stopped`   | Like `always`, but not if the container was manually stopped      |
+
+To change the restart policy of a running container without redeploying:
+
+```bash
+docker update --restart always <container_name>
+```
+
+For example:
+
+```bash
+docker update --restart always db backend frontend
+```
+
+---
+
 ## Documentation Under the Hood
 The deployment flow follows the structure provided in the following svg. 
 ![Deployment Flow - chart based documentation](img/deploy_flow.svg)
